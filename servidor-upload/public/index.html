@@ -6,20 +6,65 @@
     <style>
         body { font-family: Arial; margin: 50px; }
         input, button { padding: 10px; margin: 5px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 5px 0; }
     </style>
 </head>
 <body>
     <h1>Envio de Múltiplos Arquivos</h1>
+
     <form id="uploadForm">
         <input type="file" id="fileInput" name="files" multiple required>
         <button type="submit">Enviar</button>
     </form>
+
     <p id="status"></p>
+
+    <h2>Arquivos Disponíveis</h2>
+    <ul id="fileList"></ul>
 
     <script>
         const form = document.getElementById('uploadForm');
         const status = document.getElementById('status');
+        const fileList = document.getElementById('fileList');
 
+        // 🟢 Função para carregar lista de arquivos
+        async function loadFiles() {
+            fileList.innerHTML = '';
+            try {
+                const res = await fetch('/files');
+                const files = await res.json();
+
+                if (files.length === 0) {
+                    fileList.innerHTML = '<li>Nenhum arquivo enviado.</li>';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        ${file}
+                        <a href="/download/${file}" target="_blank">[Baixar]</a>
+                        <button onclick="deleteFile('${file}')">Deletar</button>
+                    `;
+                    fileList.appendChild(li);
+                });
+            } catch (err) {
+                fileList.innerHTML = '<li>Erro ao carregar arquivos.</li>';
+            }
+        }
+
+        // 🗑️ Função para deletar arquivo
+        async function deleteFile(filename) {
+            if (confirm(`Deseja deletar o arquivo "${filename}"?`)) {
+                const res = await fetch(`/delete/${filename}`, { method: 'DELETE' });
+                const text = await res.text();
+                alert(text);
+                loadFiles();
+            }
+        }
+
+        // 🚀 Upload de arquivos
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
@@ -45,6 +90,8 @@
 
                 if (response.ok) {
                     status.textContent = text;
+                    fileInput.value = '';
+                    loadFiles();
                 } else {
                     status.textContent = 'Erro: ' + text;
                 }
@@ -52,6 +99,9 @@
                 status.textContent = 'Erro ao enviar: ' + err;
             }
         });
+
+        // 🔄 Carregar lista ao iniciar
+        loadFiles();
     </script>
 </body>
 </html>
