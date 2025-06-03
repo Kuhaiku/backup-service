@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload de Arquivos</title>
+    <style>
+        body { font-family: Arial; margin: 50px; }
+        input, button { padding: 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Envio de Múltiplos Arquivos</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" name="files" multiple required>
+        <button type="submit">Enviar</button>
+    </form>
+    <p id="status"></p>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const status = document.getElementById('status');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                status.textContent = 'Selecione pelo menos um arquivo.';
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const text = await response.text();
+
+                if (response.ok) {
+                    status.textContent = text;
+                } else {
+                    status.textContent = 'Erro: ' + text;
+                }
+            } catch (err) {
+                status.textContent = 'Erro ao enviar: ' + err;
+            }
+        });
+    </script>
+</body>
+</html>
