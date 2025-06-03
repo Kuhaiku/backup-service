@@ -21,34 +21,34 @@ const storage = multer.diskStorage({
         cb(null, file.originalname);
     }
 });
-
 const upload = multer({ storage });
 
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware para JSON
 app.use(express.json());
 
-// Upload de múltiplos arquivos
-app.post('/upload', upload.array('files', 50), (req, res) => {
+// 🚀 Upload de múltiplos arquivos
+app.post('/upload', upload.array('files', 20), (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
-
     const nomesArquivos = req.files.map(file => file.originalname);
     res.send(`Arquivos enviados com sucesso: ${nomesArquivos.join(', ')}`);
 });
 
-// Listar arquivos
+// 📄 Listar arquivos disponíveis
 app.get('/files', (req, res) => {
     fs.readdir(uploadFolder, (err, files) => {
         if (err) {
-            return res.status(500).send('Erro ao listar arquivos.');
+            return res.status(500).json({ error: 'Erro ao ler a pasta.' });
         }
         res.json(files);
     });
 });
 
-// Download de arquivo
+// 📥 Baixar arquivo específico
 app.get('/download/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(uploadFolder, filename);
@@ -60,24 +60,20 @@ app.get('/download/:filename', (req, res) => {
     }
 });
 
-// Deletar arquivo
+// 🗑️ Deletar arquivo específico
 app.delete('/delete/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(uploadFolder, filename);
 
     if (fs.existsSync(filePath)) {
-        fs.unlink(filePath, (err) => {
-            if (err) {
-                return res.status(500).send('Erro ao deletar arquivo.');
-            }
-            res.send(`Arquivo ${filename} deletado com sucesso.`);
-        });
+        fs.unlinkSync(filePath);
+        res.send(`Arquivo ${filename} deletado com sucesso.`);
     } else {
         res.status(404).send('Arquivo não encontrado.');
     }
 });
 
-// Iniciar servidor
+// 🔥 Iniciar servidor
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
