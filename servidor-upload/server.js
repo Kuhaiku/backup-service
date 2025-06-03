@@ -6,13 +6,13 @@ const fs = require('fs');
 const app = express();
 const PORT = 3000;
 
-// Criar pasta uploads se não existir
+// Pasta onde os arquivos serão armazenados
 const uploadFolder = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadFolder)) {
     fs.mkdirSync(uploadFolder);
 }
 
-// Configuração do Multer
+// Configuração do multer
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadFolder);
@@ -26,15 +26,55 @@ const upload = multer({ storage });
 
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-// Rota de upload de múltiplos arquivos
-app.post('/upload', upload.array('files', 20), (req, res) => {
+// Upload de múltiplos arquivos
+app.post('/upload', upload.array('files', 50), (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
 
     const nomesArquivos = req.files.map(file => file.originalname);
     res.send(`Arquivos enviados com sucesso: ${nomesArquivos.join(', ')}`);
+});
+
+// Listar arquivos
+app.get('/files', (req, res) => {
+    fs.readdir(uploadFolder, (err, files) => {
+        if (err) {
+            return res.status(500).send('Erro ao listar arquivos.');
+        }
+        res.json(files);
+    });
+});
+
+// Download de arquivo
+app.get('/download/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadFolder, filename);
+
+    if (fs.existsSync(filePath)) {
+        res.download(filePath);
+    } else {
+        res.status(404).send('Arquivo não encontrado.');
+    }
+});
+
+// Deletar arquivo
+app.delete('/delete/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadFolder, filename);
+
+    if (fs.existsSync(filePath)) {
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                return res.status(500).send('Erro ao deletar arquivo.');
+            }
+            res.send(`Arquivo ${filename} deletado com sucesso.`);
+        });
+    } else {
+        res.status(404).send('Arquivo não encontrado.');
+    }
 });
 
 // Iniciar servidor
