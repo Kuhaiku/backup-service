@@ -1,20 +1,43 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Upload de Arquivos</title>
     <style>
-        body { font-family: Arial; margin: 50px; }
-        input, button { padding: 10px; margin: 5px; }
+        body { font-family: Arial, sans-serif; margin: 50px; max-width: 600px; }
+        input, button { padding: 10px; margin: 5px 0; }
         ul { list-style-type: none; padding: 0; }
-        li { margin: 5px 0; }
+        li { margin: 8px 0; }
+        li a { margin-left: 10px; text-decoration: none; color: #0066cc; }
+        li button { margin-left: 10px; }
+        #storageBarContainer {
+            border: 1px solid #ccc;
+            width: 100%;
+            max-width: 400px;
+            height: 25px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        #storageBar {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0%;
+            transition: width 0.5s;
+        }
     </style>
 </head>
 <body>
     <h1>Envio de Múltiplos Arquivos</h1>
 
+    <h2>Uso do Armazenamento</h2>
+    <div id="storageBarContainer">
+        <div id="storageBar"></div>
+    </div>
+    <p id="storageText"></p>
+
     <form id="uploadForm">
-        <input type="file" id="fileInput" name="files" multiple required>
+        <input type="file" id="fileInput" name="files" multiple required />
         <button type="submit">Enviar</button>
     </form>
 
@@ -27,8 +50,9 @@
         const form = document.getElementById('uploadForm');
         const status = document.getElementById('status');
         const fileList = document.getElementById('fileList');
+        const storageBar = document.getElementById('storageBar');
+        const storageText = document.getElementById('storageText');
 
-        // 🟢 Função para carregar lista de arquivos
         async function loadFiles() {
             fileList.innerHTML = '';
             try {
@@ -44,7 +68,7 @@
                     const li = document.createElement('li');
                     li.innerHTML = `
                         ${file}
-                        <a href="/download/${file}" target="_blank">[Baixar]</a>
+                        <a href="/download/${encodeURIComponent(file)}" target="_blank">[Baixar]</a>
                         <button onclick="deleteFile('${file}')">Deletar</button>
                     `;
                     fileList.appendChild(li);
@@ -52,19 +76,39 @@
             } catch (err) {
                 fileList.innerHTML = '<li>Erro ao carregar arquivos.</li>';
             }
+            updateStorageBar();
         }
 
-        // 🗑️ Função para deletar arquivo
         async function deleteFile(filename) {
             if (confirm(`Deseja deletar o arquivo "${filename}"?`)) {
-                const res = await fetch(`/delete/${filename}`, { method: 'DELETE' });
-                const text = await res.text();
-                alert(text);
-                loadFiles();
+                try {
+                    const res = await fetch(`/delete/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                    const text = await res.text();
+                    alert(text);
+                    loadFiles();
+                } catch {
+                    alert('Erro ao deletar arquivo.');
+                }
             }
         }
 
-        // 🚀 Upload de arquivos
+        async function updateStorageBar() {
+            try {
+                const res = await fetch('/storage');
+                const data = await res.json();
+
+                const usedMB = (data.used / (1024 * 1024)).toFixed(2);
+                const maxMB = (data.max / (1024 * 1024)).toFixed(2);
+                const percentUsed = ((data.used / data.max) * 100).toFixed(2);
+
+                storageBar.style.width = percentUsed + '%';
+                storageText.textContent = `Usado: ${usedMB} MB de ${maxMB} MB (${percentUsed}%)`;
+            } catch (err) {
+                storageText.textContent = 'Erro ao atualizar barra de armazenamento.';
+                console.error(err);
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
@@ -100,7 +144,7 @@
             }
         });
 
-        // 🔄 Carregar lista ao iniciar
+        // Inicializa a lista e barra ao carregar a página
         loadFiles();
     </script>
 </body>
