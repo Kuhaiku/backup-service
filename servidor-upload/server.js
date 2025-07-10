@@ -2,42 +2,53 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = 3000;
 
-// Usuário mestre que pode ver todos os arquivos.
-const MASTER_USER = 'master';
+// --- CONFIGURAÇÃO DE USUÁRIOS ---
+const USERS_FILE_PATH = path.join(__dirname, 'users.json');
+const MASTER_EMAIL = 'master@master.com'; // E-mail do usuário mestre
 
-// Pasta base para uploads.
+// Função para gerar hash da senha (mais seguro que texto plano)
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+}
+
+// Função para verificar a senha
+function verifyPassword(password, original) {
+    const [salt, originalHash] = original.split(':');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return hash === originalHash;
+}
+
+// Funções para ler e escrever no arquivo de usuários
+function readUsers() {
+    if (!fs.existsSync(USERS_FILE_PATH)) {
+        fs.writeFileSync(USERS_FILE_PATH, '[]');
+    }
+    const data = fs.readFileSync(USERS_FILE_PATH);
+    return JSON.parse(data);
+}
+
+function writeUsers(users) {
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+}
+
+// --- CONFIGURAÇÃO DE ARQUIVOS ---
 const baseUploadFolder = path.join(__dirname, 'uploads');
 if (!fs.existsSync(baseUploadFolder)) {
     fs.mkdirSync(baseUploadFolder);
 }
 
-// Limite máximo de armazenamento em bytes (500 MB).
-const MAX_STORAGE_BYTES = 500 * 1024 * 1024;
-
-// Função para calcular o tamanho da pasta de um usuário.
-function getFolderSize(folderPath) {
-    if (!fs.existsSync(folderPath)) return 0;
-    const files = fs.readdirSync(folderPath);
-    let totalSize = 0;
-    files.forEach(file => {
-        const stats = fs.statSync(path.join(folderPath, file));
-        if (stats.isFile()) {
-            totalSize += stats.size;
-        }
-    });
-    return totalSize;
-}
-
-// Configuração do multer para salvar arquivos na pasta do usuário.
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const user = req.query.user || 'default';
-        const userFolder = path.join(baseUploadFolder, user);
-        // Cria a pasta do usuário se não existir.
+        // Usa o email (em minúsculas) para nomear a pasta
+        const userEmail = (req.query.user || 'default').toLowerCase();
+        const userFolder = path.join(baseUploadFolder, userEmail);
         if (!fs.existsSync(userFolder)) {
             fs.mkdirSync(userFolder, { recursive: true });
         }
@@ -50,70 +61,104 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Servir arquivos estáticos da pasta 'public'.
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Rota de Upload - agora salva na pasta do usuário.
-app.post('/upload', upload.array('files', 20), (req, res) => {
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).send('Nenhum arquivo enviado.');
+// --- ROTAS DE AUTENTICAÇÃO ---
+
+app.post('/register', (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
     }
-    const nomesArquivos = req.files.map(file => file.originalname);
-    res.send(`Arquivos enviados com sucesso: ${nomesArquivos.join(', ')}`);
+
+    const users = readUsers();
+    // Verifica se o email já existe (case-insensitive)
+    const userExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+    if (userExists) {
+        return res.status(409).json({ message: 'Este e-mail já está cadastrado.' });
+    }
+
+    const newUser = {
+        email: email.toLowerCase(),
+        password: hashPassword(password),
+        role: email.toLowerCase() === MASTER_EMAIL ? 'master' : 'user' // Define a role
+    };
+
+    users.push(newUser);
+    writeUsers(users);
+
+    res.status(201).json({ message: 'Usuário cadastrado com sucesso!' });
 });
 
-// Rota para Listar Arquivos - com lógica para o usuário mestre.
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+    const users = readUsers();
+
+    // Procura o usuário pelo e-mail (case-insensitive)
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user || !verifyPassword(password, user.password)) {
+        return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+    }
+
+    res.json({
+        message: 'Login bem-sucedido!',
+        user: { email: user.email, role: user.role }
+    });
+});
+
+
+// --- ROTAS DE ARQUIVOS (Adaptadas para usar o e-mail como identificador) ---
+
+// As rotas de arquivos (/files, /download, /delete, etc.) permanecem quase iguais,
+// mas agora a identificação do usuário (e sua pasta) é o e-mail.
+
 app.get('/files', (req, res) => {
-    const user = req.query.user;
-    if (!user) {
+    const userEmail = (req.query.user || '').toLowerCase();
+    if (!userEmail) {
         return res.status(400).json({ error: 'Usuário não especificado.' });
     }
 
-    // Se for o usuário mestre, lista todos os arquivos de todos os usuários.
-    if (user === MASTER_USER) {
+    const users = readUsers();
+    const currentUser = users.find(u => u.email === userEmail);
+
+    if (!currentUser) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Se for o usuário mestre, lista todos os arquivos
+    if (currentUser.role === 'master') {
         const allFiles = [];
-        const users = fs.readdirSync(baseUploadFolder);
-        users.forEach(u => {
-            const userFolder = path.join(baseUploadFolder, u);
-            if (fs.statSync(userFolder).isDirectory()) {
-                const userFiles = fs.readdirSync(userFolder).map(file => ({ user: u, name: file }));
-                allFiles.push(...userFiles);
-            }
+        const userFolders = fs.readdirSync(baseUploadFolder);
+        userFolders.forEach(folder => {
+            const userFolderFiles = fs.readdirSync(path.join(baseUploadFolder, folder));
+            userFolderFiles.forEach(file => {
+                allFiles.push({ user: folder, name: file });
+            });
         });
         return res.json(allFiles);
     }
 
-    // Para usuários normais, lista apenas os arquivos da sua pasta.
-    const userFolder = path.join(baseUploadFolder, user);
-    if (!fs.existsSync(userFolder)) {
-        return res.json([]); // Retorna lista vazia se a pasta não existe.
-    }
-    fs.readdir(userFolder, (err, files) => {
-        if (err) {
-            return res.status(500).json({ error: 'Erro ao ler a pasta de arquivos.' });
-        }
-        res.json(files.map(file => ({ user, name: file })));
-    });
+    // Para usuários normais, lista apenas os da sua pasta
+    const userFolder = path.join(baseUploadFolder, userEmail);
+    if (!fs.existsSync(userFolder)) return res.json([]);
+
+    const files = fs.readdirSync(userFolder);
+    res.json(files.map(file => ({ user: userEmail, name: file })));
 });
 
-// Rota para Baixar Arquivo.
+// Download, Delete e Upload usam o e-mail na URL
 app.get('/download/:user/:filename', (req, res) => {
     const { user, filename } = req.params;
-    const filePath = path.join(baseUploadFolder, user, filename);
-
-    if (fs.existsSync(filePath)) {
-        res.download(filePath);
-    } else {
-        res.status(404).send('Arquivo não encontrado.');
-    }
+    const filePath = path.join(baseUploadFolder, user.toLowerCase(), filename);
+    if (fs.existsSync(filePath)) res.download(filePath);
+    else res.status(404).send('Arquivo não encontrado.');
 });
 
-// Rota para Deletar Arquivo.
 app.delete('/delete/:user/:filename', (req, res) => {
     const { user, filename } = req.params;
-    const filePath = path.join(baseUploadFolder, user, filename);
-
+    const filePath = path.join(baseUploadFolder, user.toLowerCase(), filename);
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
         res.send(`Arquivo ${filename} deletado com sucesso.`);
@@ -122,21 +167,15 @@ app.delete('/delete/:user/:filename', (req, res) => {
     }
 });
 
-// Rota para verificar o uso de armazenamento.
-app.get('/storage', (req, res) => {
-    try {
-        const usedBytes = getFolderSize(baseUploadFolder); // Calcula o total usado.
-        res.json({
-            used: usedBytes,
-            max: MAX_STORAGE_BYTES
-        });
-    } catch (err) {
-        res.status(500).json({ error: 'Erro ao calcular uso de armazenamento.' });
+app.post('/upload', upload.array('files', 20), (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).send('Nenhum arquivo enviado.');
     }
+    res.send(`Arquivos enviados com sucesso.`);
 });
 
-// Iniciar o servidor.
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
-    console.log(`Login mestre: use o nome de usuário '${MASTER_USER}'`);
+    console.log(`Usuário Mestre: Cadastre-se ou faça login com o e-mail '${MASTER_EMAIL}'`);
 });
