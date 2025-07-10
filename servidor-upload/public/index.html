@@ -372,6 +372,10 @@ async function loadFiles() {
       const tr = document.createElement('tr');
       const isMaster = currentUser.role === 'master';
       
+      // *** CORREÇÃO APLICADA AQUI ***
+      const userEncoded = encodeURIComponent(file.user);
+      const filenameEncoded = encodeURIComponent(file.name);
+      
       tr.innerHTML = `
         <td class="checkbox-col">
             <input type="checkbox" class="file-checkbox" data-user="${file.user}" data-name="${file.name}" onchange="updateDeleteButtonState()">
@@ -384,8 +388,8 @@ async function loadFiles() {
         </td>
         ${isMaster ? `<td>${file.user}</td>` : ''}
         <td class="actions">
-          <a href="/preview/${file.user}/${encodeURIComponent(file.name)}" target="_blank" title="Visualizar">${previewIconSvg}</a>
-          <a href="/download/${file.user}/${encodeURIComponent(file.name)}" title="Baixar">${downloadIconSvg}</a>
+          <a href="/preview/${userEncoded}/${filenameEncoded}" target="_blank" title="Visualizar">${previewIconSvg}</a>
+          <a href="/download/${userEncoded}/${filenameEncoded}" title="Baixar">${downloadIconSvg}</a>
         </td>
       `;
       fileList.appendChild(tr);
