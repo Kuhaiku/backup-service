@@ -18,6 +18,9 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, original) {
+    if (!original || typeof original !== 'string' || !original.includes(':')) {
+        return false;
+    }
     const [salt, originalHash] = original.split(':');
     const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
     return hash === originalHash;
@@ -25,13 +28,13 @@ function verifyPassword(password, original) {
 
 function readUsers() {
     if (!fs.existsSync(USERS_FILE_PATH)) {
-        fs.writeFileSync(USERS_FILE_PATH, '[]');
+        fs.writeFileSync(USERS_FILE_PATH, '[]', 'utf-8');
     }
-    return JSON.parse(fs.readFileSync(USERS_FILE_PATH));
+    return JSON.parse(fs.readFileSync(USERS_FILE_PATH, 'utf-8'));
 }
 
 function writeUsers(users) {
-    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
 }
 
 // --- CONFIGURAÇÃO DE ARQUIVOS ---
@@ -40,18 +43,15 @@ if (!fs.existsSync(baseUploadFolder)) {
     fs.mkdirSync(baseUploadFolder);
 }
 
-// Função de segurança para garantir que o caminho do arquivo está dentro da pasta do usuário
 function getSafePath(userEmail, relativePath = '') {
     const userFolder = path.join(baseUploadFolder, userEmail);
-    // Garante que a pasta do usuário exista
     if (!fs.existsSync(userFolder)) {
         fs.mkdirSync(userFolder, { recursive: true });
     }
     const targetPath = path.join(userFolder, relativePath);
     const normalizedPath = path.normalize(targetPath);
-
     if (!normalizedPath.startsWith(userFolder)) {
-        throw new Error('Acesso negado: tentativa de sair do diretório do usuário.');
+        throw new Error('Acesso negado.');
     }
     return normalizedPath;
 }
@@ -77,7 +77,7 @@ const upload = multer({ storage });
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// --- ROTAS DE AUTENTICAÇÃO --- (Sem alterações)
+// --- ROTAS DE AUTENTICAÇÃO ---
 app.post('/register', (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
@@ -106,8 +106,6 @@ app.post('/login', (req, res) => {
 });
 
 // --- ROTAS DE ARQUIVOS E PASTAS ---
-
-// Lista arquivos e pastas
 app.post('/files', (req, res) => {
     try {
         const { user, currentPath } = req.body;
@@ -119,87 +117,70 @@ app.post('/files', (req, res) => {
         }));
         res.json(files);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Upload de arquivos
 app.post('/upload', upload.array('files', 20), (req, res) => {
     res.json({ message: 'Arquivos enviados com sucesso!' });
 });
 
-// Criar pasta
 app.post('/folders/create', (req, res) => {
     try {
         const { user, currentPath, folderName } = req.body;
-        if (!folderName || /[\\/]/.test(folderName)) {
-            return res.status(400).json({ message: 'Nome de pasta inválido.' });
-        }
+        if (!folderName || /[\\/]/.test(folderName)) return res.status(400).json({ message: 'Nome de pasta inválido.' });
         const newFolderPath = getSafePath(user.email, path.join(currentPath, folderName));
-        if (fs.existsSync(newFolderPath)) {
-            return res.status(409).json({ message: 'Uma pasta com este nome já existe.' });
-        }
+        if (fs.existsSync(newFolderPath)) return res.status(409).json({ message: 'Uma pasta com este nome já existe.' });
         fs.mkdirSync(newFolderPath);
         res.json({ message: 'Pasta criada com sucesso!' });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Renomear arquivo ou pasta
 app.post('/items/rename', (req, res) => {
     try {
         const { user, currentPath, oldName, newName } = req.body;
-        if (!newName || /[\\/]/.test(newName)) {
-            return res.status(400).json({ message: 'Novo nome inválido.' });
-        }
+        if (!newName || /[\\/]/.test(newName)) return res.status(400).json({ message: 'Novo nome inválido.' });
         const oldPath = getSafePath(user.email, path.join(currentPath, oldName));
         const newPath = getSafePath(user.email, path.join(currentPath, newName));
-
         if (!fs.existsSync(oldPath)) return res.status(404).json({ message: 'Item original não encontrado.' });
         if (fs.existsSync(newPath)) return res.status(409).json({ message: 'Já existe um item com o novo nome.' });
-        
         fs.renameSync(oldPath, newPath);
         res.json({ message: 'Item renomeado com sucesso!' });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
-// **NOVA ROTA PARA MOVER ITENS**
 app.post('/items/move', (req, res) => {
     try {
         const { user, currentPath, itemsToMove, destinationPath } = req.body;
-
         const destSafePath = getSafePath(user.email, destinationPath);
         if (!fs.existsSync(destSafePath) || !fs.statSync(destSafePath).isDirectory()) {
             return res.status(400).json({ message: 'Pasta de destino inválida ou não existe.' });
         }
-
         const errors = [];
         itemsToMove.forEach(itemName => {
             const sourcePath = getSafePath(user.email, path.join(currentPath, itemName));
             const finalDestPath = getSafePath(user.email, path.join(destinationPath, itemName));
-
-            if (sourcePath === destSafePath) return; // Não mover uma pasta para dentro de si mesma
-
+            if (destSafePath.startsWith(sourcePath + path.sep)) {
+                errors.push(`${itemName}: Não é possível mover uma pasta para dentro dela mesma.`);
+                return;
+            }
             if (fs.existsSync(finalDestPath)) {
                 errors.push(`${itemName}: já existe no destino.`);
             } else {
                 fs.renameSync(sourcePath, finalDestPath);
             }
         });
-
-        if (errors.length > 0) {
-            return res.status(409).json({ message: `Operação concluída com erros: ${errors.join(' ')}` });
-        }
+        if (errors.length > 0) return res.status(409).json({ message: `Operação concluída com erros: ${errors.join(' ')}` });
         res.json({ message: 'Itens movidos com sucesso!' });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Deletar múltiplos itens (arquivos e pastas)
 app.post('/items/delete', (req, res) => {
     try {
         const { user, currentPath, items } = req.body;
@@ -211,7 +192,7 @@ app.post('/items/delete', (req, res) => {
         });
         res.json({ message: `${items.length} item(ns) deletado(s) com sucesso.` });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
