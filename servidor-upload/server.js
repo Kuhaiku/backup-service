@@ -43,9 +43,11 @@ if (!fs.existsSync(baseUploadFolder)) {
 // Função de segurança para garantir que o caminho do arquivo está dentro da pasta do usuário
 function getSafePath(userEmail, relativePath = '') {
     const userFolder = path.join(baseUploadFolder, userEmail);
+    // Garante que a pasta do usuário exista
+    if (!fs.existsSync(userFolder)) {
+        fs.mkdirSync(userFolder, { recursive: true });
+    }
     const targetPath = path.join(userFolder, relativePath);
-
-    // Normaliza o caminho para resolver '..' etc.
     const normalizedPath = path.normalize(targetPath);
 
     if (!normalizedPath.startsWith(userFolder)) {
@@ -54,17 +56,12 @@ function getSafePath(userEmail, relativePath = '') {
     return normalizedPath;
 }
 
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         try {
             const userEmail = (req.query.user || 'default').toLowerCase();
             const currentPath = req.query.path || '';
             const safePath = getSafePath(userEmail, currentPath);
-            
-            if (!fs.existsSync(safePath)) {
-                fs.mkdirSync(safePath, { recursive: true });
-            }
             cb(null, safePath);
         } catch (error) {
             cb(error);
@@ -108,16 +105,13 @@ app.post('/login', (req, res) => {
     res.json({ user: { email: user.email, role: user.role } });
 });
 
-// --- NOVAS ROTAS DE ARQUIVOS E PASTAS ---
+// --- ROTAS DE ARQUIVOS E PASTAS ---
 
 // Lista arquivos e pastas
 app.post('/files', (req, res) => {
     try {
         const { user, currentPath } = req.body;
         const safePath = getSafePath(user.email, currentPath);
-        if (!fs.existsSync(safePath)) {
-            fs.mkdirSync(safePath, { recursive: true });
-        }
         const items = fs.readdirSync(safePath, { withFileTypes: true });
         const files = items.map(item => ({
             name: item.name,
@@ -138,8 +132,7 @@ app.post('/upload', upload.array('files', 20), (req, res) => {
 app.post('/folders/create', (req, res) => {
     try {
         const { user, currentPath, folderName } = req.body;
-        // Validação básica do nome da pasta
-        if (!folderName || folderName.includes('/') || folderName.includes('\\') || folderName === '..') {
+        if (!folderName || /[\\/]/.test(folderName)) {
             return res.status(400).json({ message: 'Nome de pasta inválido.' });
         }
         const newFolderPath = getSafePath(user.email, path.join(currentPath, folderName));
@@ -153,22 +146,19 @@ app.post('/folders/create', (req, res) => {
     }
 });
 
-// Renomear/Mover arquivo ou pasta
+// Renomear arquivo ou pasta
 app.post('/items/rename', (req, res) => {
     try {
         const { user, currentPath, oldName, newName } = req.body;
-        if (!newName || newName.includes('/') || newName.includes('\\')) {
+        if (!newName || /[\\/]/.test(newName)) {
             return res.status(400).json({ message: 'Novo nome inválido.' });
         }
         const oldPath = getSafePath(user.email, path.join(currentPath, oldName));
         const newPath = getSafePath(user.email, path.join(currentPath, newName));
 
-        if (!fs.existsSync(oldPath)) {
-            return res.status(404).json({ message: 'Item original não encontrado.' });
-        }
-        if (fs.existsSync(newPath)) {
-            return res.status(409).json({ message: 'Já existe um item com o novo nome.' });
-        }
+        if (!fs.existsSync(oldPath)) return res.status(404).json({ message: 'Item original não encontrado.' });
+        if (fs.existsSync(newPath)) return res.status(409).json({ message: 'Já existe um item com o novo nome.' });
+        
         fs.renameSync(oldPath, newPath);
         res.json({ message: 'Item renomeado com sucesso!' });
     } catch (error) {
@@ -176,19 +166,46 @@ app.post('/items/rename', (req, res) => {
     }
 });
 
+// **NOVA ROTA PARA MOVER ITENS**
+app.post('/items/move', (req, res) => {
+    try {
+        const { user, currentPath, itemsToMove, destinationPath } = req.body;
+
+        const destSafePath = getSafePath(user.email, destinationPath);
+        if (!fs.existsSync(destSafePath) || !fs.statSync(destSafePath).isDirectory()) {
+            return res.status(400).json({ message: 'Pasta de destino inválida ou não existe.' });
+        }
+
+        const errors = [];
+        itemsToMove.forEach(itemName => {
+            const sourcePath = getSafePath(user.email, path.join(currentPath, itemName));
+            const finalDestPath = getSafePath(user.email, path.join(destinationPath, itemName));
+
+            if (sourcePath === destSafePath) return; // Não mover uma pasta para dentro de si mesma
+
+            if (fs.existsSync(finalDestPath)) {
+                errors.push(`${itemName}: já existe no destino.`);
+            } else {
+                fs.renameSync(sourcePath, finalDestPath);
+            }
+        });
+
+        if (errors.length > 0) {
+            return res.status(409).json({ message: `Operação concluída com erros: ${errors.join(' ')}` });
+        }
+        res.json({ message: 'Itens movidos com sucesso!' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
 
 // Deletar múltiplos itens (arquivos e pastas)
 app.post('/items/delete', (req, res) => {
     try {
         const { user, currentPath, items } = req.body;
-        if (!items || !Array.isArray(items)) {
-            return res.status(400).json({ message: 'Lista de itens inválida.' });
-        }
-
         items.forEach(item => {
             const itemPath = getSafePath(user.email, path.join(currentPath, item.name));
             if (fs.existsSync(itemPath)) {
-                // `rmSync` remove arquivos e pastas recursivamente
                 fs.rmSync(itemPath, { recursive: true, force: true });
             }
         });
@@ -198,12 +215,11 @@ app.post('/items/delete', (req, res) => {
     }
 });
 
-
-// Rotas de preview e download (precisam do path completo)
+// Rotas de preview e download
 app.get('/preview/:userEmail/*', (req, res) => {
     try {
         const userEmail = req.params.userEmail;
-        const relativePath = req.params[0]; // Pega todo o caminho após o e-mail
+        const relativePath = req.params[0];
         const safePath = getSafePath(userEmail, relativePath);
         if (fs.existsSync(safePath) && fs.statSync(safePath).isFile()) {
             res.sendFile(safePath);
@@ -229,7 +245,6 @@ app.get('/download/:userEmail/*', (req, res) => {
         res.status(400).send(error.message);
     }
 });
-
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
