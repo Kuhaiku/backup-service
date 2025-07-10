@@ -2,91 +2,225 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Upload de Arquivos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meu Drive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --google-blue: #1a73e8;
+      --google-gray-border: #dadce0;
+      --google-gray-background: #f1f3f4;
+      --google-gray-text: #5f6368;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-      color: #333; margin: 0; padding: 20px; min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: 'Roboto', sans-serif;
+      background-color: #fff;
+      color: #202124;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: var(--google-gray-background);
     }
-    .form-container {
-      background: #fff; padding: 30px; border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 100%;
-      max-width: 400px; margin-bottom: 20px;
+    /* --- TELA DE LOGIN --- */
+    #authSection {
+      background-color: #fff;
+      padding: 48px 40px 36px;
+      border: 1px solid var(--google-gray-border);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 448px;
+      text-align: center;
     }
-    h1, h2 { color: #fff; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-    h2 { color: #333; text-shadow: none; margin-top: 0; }
-    input[type="email"], input[type="password"], input[type="file"] {
-      width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px;
-      border: 1px solid #ddd; font-size: 1rem;
+    #authSection h1 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+    #authSection p { color: var(--google-gray-text); margin-bottom: 24px; }
+    #authSection input {
+      width: 100%;
+      padding: 13px 15px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+      border: 1px solid var(--google-gray-border);
+      font-size: 1rem;
     }
-    button {
-      width: 100%; background-color: #2575fc; color: #fff; border: none; padding: 15px;
-      font-size: 1.1rem; border-radius: 10px; cursor: pointer; font-weight: 600;
-      transition: background-color 0.3s ease;
+    #authSection button {
+      width: 100%; background-color: var(--google-blue); color: #fff; border: none;
+      padding: 10px; font-size: 1rem; font-weight: 500; border-radius: 4px; cursor: pointer;
+      transition: background-color 0.2s;
     }
-    button:hover { background-color: #1859c6; }
+    #authSection button:hover { background-color: #1b66c9; }
+    #authToggle { color: var(--google-blue); cursor: pointer; font-weight: 500; margin-top: 15px; font-size: 0.9rem; }
     #status {
-      min-height: 1.5em; text-align: center; font-weight: 600; color: #fff;
-      text-shadow: 1px 1px 4px rgba(0,0,0,0.5); width: 100%; max-width: 450px;
+      min-height: 1.5em; text-align: center; font-weight: 500; color: #d93025;
+      margin-top: 10px; width: 100%; max-width: 448px;
     }
-    #authToggle { color: #007bff; cursor: pointer; text-align: center; margin-top: 15px; }
-    #authToggle:hover { text-decoration: underline; }
-    #mainContent { display: none; width: 100%; max-width: 500px; }
-    #fileList { list-style: none; padding: 0; background: #fff; border-radius: 12px; max-height: 300px; overflow-y: auto; }
-    #fileList li { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid #eee; }
-    #fileList li:last-child { border-bottom: none; }
-    .file-actions button { width: auto; font-size: 0.8rem; padding: 5px 10px; background-color: #ff5252; }
-    .file-actions a { font-size: 0.8rem; margin-right: 10px; }
-    #userInfo { color: white; font-weight: bold; text-align: center; margin-bottom: 20px; }
-    #logoutButton { background-color: #6c757d; margin-top: 20px; }
+
+    /* --- LAYOUT PRINCIPAL (ESTILO DRIVE) --- */
+    #drive-container {
+      display: none; /* Inicia escondido */
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      background-color: #fff;
+    }
+    .sidebar {
+      width: 256px;
+      padding: 16px;
+      border-right: 1px solid var(--google-gray-border);
+      display: flex;
+      flex-direction: column;
+    }
+    .new-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background-color: #fff;
+      color: var(--google-gray-text);
+      border: 1px solid var(--google-gray-border);
+      border-radius: 24px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+      transition: box-shadow 0.2s;
+      margin-bottom: 24px;
+    }
+    .new-button:hover { box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15); }
+    .new-button svg { width: 24px; height: 24px; }
+    .logout-button {
+      margin-top: auto; /* Empurra para o final */
+      background: none; border: none; color: var(--google-gray-text);
+      padding: 10px; cursor: pointer; text-align: left; font-size: 1rem;
+      border-radius: 4px;
+    }
+    .logout-button:hover { background-color: var(--google-gray-background); }
+    
+    .main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .header {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--google-gray-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h2 { font-size: 22px; font-weight: 400; }
+    .header #userInfo { color: var(--google-gray-text); font-size: 0.9rem; }
+    
+    .files-view {
+      padding: 24px;
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+    #fileTable {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #fileTable th {
+      text-align: left;
+      padding-bottom: 12px;
+      font-weight: 500;
+      color: var(--google-gray-text);
+      border-bottom: 1px solid var(--google-gray-border);
+    }
+    #fileTable td {
+      padding: 12px 4px;
+      border-bottom: 1px solid var(--google-gray-border);
+      vertical-align: middle;
+    }
+    #fileTable tr:hover { background-color: var(--google-gray-background); }
+    .file-name { display: flex; align-items: center; gap: 12px; }
+    .file-icon { color: var(--google-gray-text); }
+    .actions a, .actions button {
+      background: none; border: none; cursor: pointer; color: var(--google-gray-text);
+      padding: 8px; border-radius: 50%;
+    }
+    .actions a:hover, .actions button:hover { background-color: #e0e0e0; }
+    
+    /* Input de upload fica escondido */
+    #fileInput { display: none; }
   </style>
 </head>
 <body>
-  <h1>Serviço de Backup</h1>
 
-  <div id="authSection" class="form-container">
-    <div id="loginForm">
-      <h2>Login</h2>
-      <input type="email" id="loginEmail" placeholder="E-mail" required />
-      <input type="password" id="loginPassword" placeholder="Senha" required />
-      <button onclick="handleLogin()">Entrar</button>
-      <p id="authToggle" onclick="toggleAuthForms()">Não tem uma conta? Cadastre-se</p>
+  <div id="authContainer">
+    <div id="authSection">
+      <div id="loginForm">
+        <h1>Fazer login</h1>
+        <p>Use sua Conta</p>
+        <input type="email" id="loginEmail" placeholder="E-mail" required />
+        <input type="password" id="loginPassword" placeholder="Senha" required />
+        <button onclick="handleLogin()">Avançar</button>
+        <p id="authToggle" onclick="toggleAuthForms()">Criar conta</p>
+      </div>
+      <div id="registerForm" style="display: none;">
+        <h1>Criar sua Conta</h1>
+        <p>Continue para o Drive</p>
+        <input type="email" id="registerEmail" placeholder="E-mail" required />
+        <input type="password" id="registerPassword" placeholder="Senha" required />
+        <button onclick="handleRegister()">Cadastrar</button>
+        <p id="authToggle" onclick="toggleAuthForms()">Fazer login</p>
+      </div>
     </div>
-    <div id="registerForm" style="display: none;">
-      <h2>Cadastro</h2>
-      <input type="email" id="registerEmail" placeholder="E-mail" required />
-      <input type="password" id="registerPassword" placeholder="Senha" required />
-      <button onclick="handleRegister()">Cadastrar</button>
-      <p id="authToggle" onclick="toggleAuthForms()">Já tem uma conta? Faça login</p>
-    </div>
+    <p id="status"></p>
   </div>
-  <p id="status"></p>
 
-  <div id="mainContent">
-    <div id="userInfo"></div>
-    <div class="form-container">
-      <h2>Meus Arquivos</h2>
-      <input type="file" id="fileInput" name="files" multiple required />
-      <button onclick="handleUpload()">Enviar Arquivos</button>
-      <ul id="fileList"></ul>
-    </div>
-    <button id="logoutButton" onclick="logout()">Sair</button>
+  <div id="drive-container">
+    <aside class="sidebar">
+      <button class="new-button" onclick="triggerUpload()">
+        <svg focusable="false" viewBox="0 0 24 24"><path d="M20 13h-7v7h-2v-7H4v-2h7V4h2v7h7v2z"></path></svg>
+        <span>Novo</span>
+      </button>
+      <input type="file" id="fileInput" multiple onchange="handleUpload()">
+      <button class="logout-button" onclick="logout()">Sair</button>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <h2>Meus arquivos</h2>
+        <div id="userInfo"></div>
+      </header>
+      <div class="files-view">
+        <table id="fileTable">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th id="owner-col-header" style="display: none;">Proprietário</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="fileList"></tbody>
+        </table>
+      </div>
+    </main>
   </div>
 
 <script>
+// --- Seletores de Elementos ---
 const statusEl = document.getElementById('status');
-const authSection = document.getElementById('authSection');
-const mainContent = document.getElementById('mainContent');
+const authContainer = document.getElementById('authContainer');
+const driveContainer = document.getElementById('drive-container');
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
 const fileList = document.getElementById('fileList');
 const userInfo = document.getElementById('userInfo');
+const fileInput = document.getElementById('fileInput');
 
 let currentUser = null;
+
+// --- ÍCONES SVG ---
+const fileIconSvg = `<svg class="file-icon" focusable="false" viewBox="0 0 24 24" width="24" height="24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"></path></svg>`;
+const downloadIconSvg = `<svg focusable="false" viewBox="0 0 24 24" width="24" height="24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>`;
+const deleteIconSvg = `<svg focusable="false" viewBox="0 0 24 24" width="24" height="24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
 
 // --- LÓGICA DE UI ---
 function toggleAuthForms() {
@@ -97,31 +231,38 @@ function toggleAuthForms() {
 
 function showMainContent(user) {
   currentUser = user;
-  authSection.style.display = 'none';
-  mainContent.style.display = 'block';
+  authContainer.style.display = 'none';
+  driveContainer.style.display = 'flex';
   statusEl.textContent = '';
-  userInfo.textContent = `Logado como: ${currentUser.email}`;
-  if(currentUser.role === 'master') {
-      userInfo.textContent += ' (Admin)';
+  userInfo.textContent = currentUser.email;
+  
+  // Mostra a coluna "Proprietário" se for o admin
+  const ownerHeader = document.getElementById('owner-col-header');
+  if (currentUser.role === 'master') {
+    ownerHeader.style.display = 'table-cell';
+  } else {
+    ownerHeader.style.display = 'none';
   }
+  
   loadFiles();
 }
 
 function logout() {
   currentUser = null;
-  authSection.style.display = 'block';
-  mainContent.style.display = 'none';
-  statusEl.textContent = 'Você saiu.';
+  authContainer.style.display = 'block';
+  driveContainer.style.display = 'none';
 }
 
 // --- CHAMADAS À API ---
-async function handleApiCall(url, options, successMessage) {
-  statusEl.textContent = 'Processando...';
+async function handleApiCall(url, options, isLogin = false) {
+  statusEl.textContent = '';
   try {
     const response = await fetch(url, options);
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Ocorreu um erro.');
-    statusEl.textContent = successMessage || data.message;
+    if (!isLogin) {
+      alert(data.message);
+    }
     return data;
   } catch (err) {
     statusEl.textContent = `Erro: ${err.message}`;
@@ -137,9 +278,9 @@ async function handleLogin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
-    });
+    }, true);
     showMainContent(data.user);
-  } catch (err) { /* erro já tratado em handleApiCall */ }
+  } catch (err) { /* erro já tratado */ }
 }
 
 async function handleRegister() {
@@ -150,52 +291,64 @@ async function handleRegister() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
-    }, 'Cadastro realizado com sucesso! Faça o login.');
+    });
     toggleAuthForms(); // Volta para a tela de login
   } catch (err) { /* erro já tratado */ }
 }
 
+// --- FUNCIONALIDADES DE ARQUIVO ---
+function triggerUpload() {
+  fileInput.click();
+}
+
 async function handleUpload() {
-  const fileInput = document.getElementById('fileInput');
-  if (fileInput.files.length === 0) {
-    statusEl.textContent = 'Selecione pelo menos um arquivo.';
-    return;
-  }
+  if (fileInput.files.length === 0) return;
+  
   const formData = new FormData();
   for (const file of fileInput.files) {
     formData.append('files', file);
   }
   
   try {
-    await fetch(`/upload?user=${currentUser.email}`, { method: 'POST', body: formData });
-    statusEl.textContent = 'Arquivos enviados com sucesso!';
-    fileInput.value = '';
+    const res = await fetch(`/upload?user=${currentUser.email}`, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error('Falha no upload.');
+    fileInput.value = ''; // Limpa para permitir o mesmo upload novamente
     loadFiles();
   } catch (err) {
-    statusEl.textContent = 'Erro no envio.';
+    alert('Erro no envio: ' + err.message);
   }
 }
 
 async function loadFiles() {
-  fileList.innerHTML = '<li>Carregando...</li>';
+  fileList.innerHTML = '<tr><td colspan="3">Carregando...</td></tr>';
   const res = await fetch(`/files?user=${currentUser.email}`);
   const files = await res.json();
   fileList.innerHTML = '';
+  
   if (files.length === 0) {
-    fileList.innerHTML = '<li>Nenhum arquivo encontrado.</li>';
+    fileList.innerHTML = '<tr><td colspan="3">Nenhum arquivo encontrado.</td></tr>';
     return;
   }
+  
   files.forEach(file => {
-    const li = document.createElement('li');
-    const displayName = currentUser.role === 'master' ? `[${file.user}] ${file.name}` : file.name;
-    li.innerHTML = `
-      <span>${displayName}</span>
-      <div class="file-actions">
-        <a href="/download/${file.user}/${encodeURIComponent(file.name)}" target="_blank">Baixar</a>
-        <button onclick="deleteFile('${file.user}', '${file.name}')">Deletar</button>
-      </div>
+    const tr = document.createElement('tr');
+    
+    const ownerCell = currentUser.role === 'master' ? `<td>${file.user}</td>` : '';
+    
+    tr.innerHTML = `
+      <td>
+        <div class="file-name">
+          ${fileIconSvg}
+          <span>${file.name}</span>
+        </div>
+      </td>
+      ${ownerCell}
+      <td class="actions">
+        <a href="/download/${file.user}/${encodeURIComponent(file.name)}" title="Baixar">${downloadIconSvg}</a>
+        <button onclick="deleteFile('${file.user}', '${file.name}')" title="Deletar">${deleteIconSvg}</button>
+      </td>
     `;
-    fileList.appendChild(li);
+    fileList.appendChild(tr);
   });
 }
 
