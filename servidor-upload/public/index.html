@@ -55,43 +55,17 @@
     const renameIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
     const deleteIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#d93025" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
     
-    function escapeHTML(str) {
-        if (typeof str !== 'string') return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-    }
-    
-    async function apiCall(endpoint, body = {}) {
-        const options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, user: currentUser, currentPath }) };
-        const response = await fetch(endpoint, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Ocorreu um erro.');
-        return data;
-    }
+    function escapeHTML(str) { if (typeof str !== 'string') return ''; return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+    async function apiCall(endpoint, body = {}) { const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, user: currentUser, currentPath }) }); const data = await response.json(); if (!response.ok) throw new Error(data.message); return data; }
 
-    // --- UI Rendering ---
     function renderAuthUI() { document.getElementById('authContainer').innerHTML = `<div class="form-box" id="loginForm"><h1>Fazer login</h1><input type="email" id="loginEmail" placeholder="E-mail" required /><input type="password" id="loginPassword" placeholder="Senha" required /><button onclick="handleLogin()">Entrar</button><p onclick="toggleAuthForms()" style="cursor:pointer;color:var(--google-blue);margin-top:15px;">Criar conta</p></div><div class="form-box" id="registerForm" style="display: none;"><h1>Criar Conta</h1><input type="email" id="registerEmail" placeholder="E-mail" required /><input type="password" id="registerPassword" placeholder="Senha" required /><button onclick="handleRegister()">Cadastrar</button><p onclick="toggleAuthForms()" style="cursor:pointer;color:var(--google-blue);margin-top:15px;">Já tem uma conta?</p></div><p id="status"></p>`; }
-    function renderMainUI() { document.getElementById('main-view').innerHTML = `<header class="top-bar"><h2>Meu Drive</h2><div class="profile-section"><span id="userInfo"></span><button onclick="logout()">Sair</button></div></header><div class="content-area"><div id="breadcrumb"></div><section class="files-view"><div class="files-header"><div><input type="file" id="fileInput" multiple style="display:none" onchange="handleUpload(event)"><button onclick="document.getElementById('fileInput').click()">Upload</button><button onclick="showNewFolderModal()">+ Nova Pasta</button></div><div><button id="move-selected-btn" onclick="showMoveModal()">Mover</button><button id="delete-selected-btn" onclick="deleteSelectedItems()">Excluir</button></div></div><table id="fileTable"><thead><tr><th><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Nome</th><th style="text-align:right">Ações</th></tr></thead><tbody id="fileList"></tbody></table></section></div>`; }
-
-    // --- Auth Logic ---
-    async function handleLogin() {
-        try {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const response = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
-            currentUser = data.user;
-            document.getElementById('authContainer').style.display = 'none';
-            document.getElementById('main-view').style.display = 'block';
-            document.getElementById('userInfo').textContent = currentUser.email;
-            loadFiles('');
-        } catch (err) { document.getElementById('status').textContent = err.message; }
-    }
+    function renderMainUI() { document.getElementById('main-view').innerHTML = `<header class="top-bar"><h2>Meu Drive</h2><div class="profile-section"><span id="userInfo"></span><button onclick="logout()">Sair</button></div></header><div class="content-area"><div id="breadcrumb"></div><section class="files-view"><div class="files-header"><div><input type="file" id="fileInput" multiple style="display:none" onchange="handleUpload(event)"><button id="upload-btn" onclick="document.getElementById('fileInput').click()">Upload</button><button id="new-folder-btn" onclick="showNewFolderModal()">+ Nova Pasta</button></div><div><button id="move-selected-btn" onclick="showMoveModal()">Mover</button><button id="delete-selected-btn" onclick="deleteSelectedItems()">Excluir</button></div></div><table id="fileTable"><thead><tr><th><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Nome</th><th style="text-align:right">Ações</th></tr></thead><tbody id="fileList"></tbody></table></section></div>`; }
+    
+    async function handleLogin() { try { const email = document.getElementById('loginEmail').value, password = document.getElementById('loginPassword').value; const response = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) }); const data = await response.json(); if (!response.ok) throw new Error(data.message); currentUser = data.user; document.getElementById('authContainer').style.display = 'none'; document.getElementById('main-view').style.display = 'block'; document.getElementById('userInfo').textContent = currentUser.email; loadFiles(''); } catch (err) { document.getElementById('status').textContent = err.message; } }
     async function handleRegister() { try { const email = document.getElementById('registerEmail').value, password = document.getElementById('registerPassword').value; const response = await fetch('/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) }); const data = await response.json(); if (!response.ok) throw new Error(data.message); alert(data.message); toggleAuthForms(); } catch (err) { document.getElementById('status').textContent = err.message; } }
     function toggleAuthForms() { const l = document.getElementById('loginForm'), r = document.getElementById('registerForm'); l.style.display = l.style.display === 'none' ? 'block' : 'none'; r.style.display = r.style.display === 'none' ? 'block' : 'none'; }
     function logout() { location.reload(); }
 
-    // --- File & Folder Logic ---
     async function loadFiles(path) {
         currentPath = path;
         try {
@@ -99,7 +73,6 @@
             const fileListBody = document.getElementById('fileList');
             fileListBody.innerHTML = '';
             items.sort((a, b) => (b.isFolder - a.isFolder) || a.name.localeCompare(b.name));
-
             if (items.length === 0) {
                 fileListBody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;">Esta pasta está vazia.</td></tr>`;
             } else {
@@ -107,26 +80,33 @@
                     const tr = document.createElement('tr');
                     const fullItemPath = `${currentPath ? currentPath + '/' : ''}${item.name}`;
                     const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
-                    const safeName = escapeHTML(item.name);
-                    const ownerEmail = (currentPath.split('/')[0] && currentUser.role === 'master') ? currentPath.split('/')[0] : currentUser.email;
+                    const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
+                    
+                    const ownerEmail = isMasterAtRoot ? item.name : (currentPath.split('/')[0] || currentUser.email);
+                    const relativePath = isMasterAtRoot ? '' : (item.isFolder ? fullItemPath.substring(ownerEmail.length+1) : fullItemPath.substring(ownerEmail.length+1) || item.name);
 
                     tr.innerHTML = `
-                        <td><input type="checkbox" class="item-checkbox" data-name="${safeName}"></td>
+                        <td><input type="checkbox" class="item-checkbox" data-name="${escapeHTML(item.name)}"></td>
                         <td><div class="item-name" ${item.isFolder ? `onclick="loadFiles('${escapeHTML(fullItemPath)}')"` : `ondblclick="previewFile('${escapeHTML(fullItemPath)}')"`}>
                             ${item.isUserFolder ? userFolderIcon : (item.isFolder ? folderIcon : fileIcon)}
                             <span>${item.name}</span>
                         </div></td>
                         <td class="actions">
-                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(fullItemPath.substring(ownerEmail.length+1))}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
-                            ${!item.isFolder ? `<a href="/download/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(fullItemPath.substring(ownerEmail.length+1))}" title="Baixar">${downloadIcon}</a>` : ''}
-                            <button onclick="showRenameModal('${safeName}')" title="Renomear">${renameIcon}</button>
-                            <button onclick="deleteSingleItem('${safeName}')" title="Excluir">${deleteIcon}</button>
+                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
+                            ${!item.isFolder && !item.isUserFolder ? `<a href="/download/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}" title="Baixar">${downloadIcon}</a>` : ''}
+                            ${!item.isUserFolder ? `<button onclick="showRenameModal('${escapeHTML(item.name)}')" title="Renomear">${renameIcon}</button>` : ''}
+                            ${!item.isUserFolder ? `<button onclick="deleteSingleItem('${escapeHTML(item.name)}')" title="Excluir">${deleteIcon}</button>` : ''}
                         </td>`;
                     fileListBody.appendChild(tr);
                 });
             }
             renderBreadcrumb();
             updateActionButtonsState();
+            // Desabilita upload/new folder na raiz do master
+            const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
+            document.getElementById('upload-btn').style.display = isMasterAtRoot ? 'none' : 'inline-block';
+            document.getElementById('new-folder-btn').style.display = isMasterAtRoot ? 'none' : 'inline-block';
+
         } catch (error) { alert(`Erro: ${error.message}`); }
     }
 
@@ -145,9 +125,12 @@
         const formData = new FormData();
         for (const file of event.target.files) formData.append('files', file);
         try {
-            await fetch(`/upload?user=${currentUser.email}&path=${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData });
+            const response = await fetch(`/upload?user=${currentUser.email}&path=${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
             event.target.value = '';
             loadFiles(currentPath);
+            alert(data.message);
         } catch(err) { alert(`Erro no upload: ${err.message}`); }
     }
 
@@ -158,7 +141,6 @@
         window.open(`/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}`, '_blank');
     }
 
-    // --- Modals ---
     function showModal(modalId, title, value, onConfirm) {
         const modal = document.getElementById(modalId);
         if(title) modal.querySelector('h3').textContent = title;
@@ -193,29 +175,28 @@
         closeModal();
     }
     
-    // --- Selection and Bulk Actions ---
     function updateActionButtonsState() {
         const anyChecked = document.querySelector('.item-checkbox:checked');
-        document.getElementById('delete-selected-btn').style.display = anyChecked ? 'inline-block' : 'none';
-        document.getElementById('move-selected-btn').style.display = anyChecked ? 'inline-block' : 'none';
+        const isMasterAtRoot = currentUser && currentUser.role === 'master' && currentPath === '';
+        document.getElementById('delete-selected-btn').style.display = anyChecked && !isMasterAtRoot ? 'inline-block' : 'none';
+        document.getElementById('move-selected-btn').style.display = anyChecked && !isMasterAtRoot ? 'inline-block' : 'none';
     }
+    
     function toggleSelectAll(checked) {
         document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked);
         updateActionButtonsState();
     }
+    
     document.body.addEventListener('change', e => { if (e.target.classList.contains('item-checkbox')) updateActionButtonsState(); });
     async function deleteItems(items) {
         if (items.length > 0 && confirm(`Deletar ${items.length} item(ns)? Esta ação não pode ser desfeita.`)) {
             await apiCall('/items/delete', { items }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
         }
     }
-    function deleteSelectedItems() {
-        const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name }));
-        deleteItems(items);
-    }
+    function deleteSelectedItems() { const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name })); deleteItems(items); }
     function deleteSingleItem(name) { deleteItems([{ name }]); }
 
-    // --- Init ---
+    // Init
     renderAuthUI();
     renderMainUI();
 </script>
