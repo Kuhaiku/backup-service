@@ -14,296 +14,203 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Roboto', sans-serif; background-color: var(--google-gray-background); color: #202124; }
 
-        /* --- Layout e Forms --- */
         .center-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
         .form-box { background-color: #fff; padding: 40px; border: 1px solid var(--google-gray-border); border-radius: 8px; width: 100%; max-width: 448px; text-align: center; margin-bottom: 16px; }
         .form-box h1 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
-        .form-box p { color: var(--google-gray-text); margin-bottom: 24px; }
-        .form-box input { width: 100%; padding: 13px 15px; margin-bottom: 15px; border-radius: 4px; border: 1px solid var(--google-gray-border); font-size: 1rem; }
-        .form-box button { width: 100%; background-color: var(--google-blue); color: #fff; border: none; padding: 10px; font-size: 1rem; font-weight: 500; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+        .form-box button { width: 100%; background-color: var(--google-blue); color: #fff; border: none; padding: 10px; font-size: 1rem; font-weight: 500; border-radius: 4px; cursor: pointer; }
         #status { min-height: 1.5em; text-align: center; font-weight: 500; color: var(--danger-red); width: 100%; max-width: 448px; }
 
-        /* --- UI Principal --- */
         #main-view { display: none; }
         .top-bar { background-color: #fff; padding: 12px 30px; border-bottom: 1px solid var(--google-gray-border); display: flex; justify-content: space-between; align-items: center; position: fixed; width: 100%; top: 0; z-index: 1000; }
-        .profile-section { display: flex; align-items: center; gap: 16px; }
         .content-area { padding: 80px 30px 30px; }
         
-        /* --- Trilha de Navegação (Breadcrumbs) --- */
         #breadcrumb { padding: 10px 0; font-size: 14px; color: var(--google-gray-text); }
         #breadcrumb a { color: var(--google-blue); text-decoration: none; cursor: pointer; }
-        #breadcrumb a:hover { text-decoration: underline; }
-        #breadcrumb span { margin: 0 5px; }
 
-        /* --- Tabela de Arquivos --- */
         .files-view { background-color: #fff; border: 1px solid var(--google-gray-border); border-radius: 8px; padding: 16px; }
         .files-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid var(--google-gray-border); }
-        .files-header button { background-color: var(--google-blue); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500; }
-        #delete-selected-btn { background-color: var(--danger-red); display: none; margin-left:10px; }
-        #fileTable { width: 100%; border-collapse: collapse; }
-        #fileTable th { text-align: left; padding: 12px 8px; font-weight: 500; color: var(--google-gray-text); }
-        #fileTable td { padding: 12px 8px; border-bottom: 1px solid var(--google-gray-border); vertical-align: middle; }
-        #fileTable tr:last-child td { border-bottom: none; }
-        .item-name { display: flex; align-items: center; gap: 16px; font-weight: 500; cursor: pointer; }
-        .item-name:hover { color: var(--google-blue); }
-        .actions { white-space: nowrap; text-align: right; }
-        .actions button { background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%; display: inline-flex; }
-        .actions button:hover { background-color: #e8e8e8; }
+        .files-header button { background-color: var(--google-blue); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: 500; margin-left: 10px; }
+        #delete-selected-btn, #move-selected-btn { background-color: var(--danger-red); display: none; }
+        #move-selected-btn { background-color: #5f6368; }
 
-        /* --- Modal --- */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background-color: #fefefe; padding: 20px; border: 1px solid #888; width: 90%; max-width: 400px; border-radius: 8px; text-align: center; }
-        .modal-content input { width: calc(100% - 20px); margin: 10px 0; }
-        .modal-content button { width: auto; padding: 10px 20px; }
+        #fileTable { width: 100%; border-collapse: collapse; }
+        #fileTable th, #fileTable td { padding: 12px 8px; vertical-align: middle; text-align: left; }
+        #fileTable th { border-bottom: 2px solid var(--google-gray-border); }
+        #fileTable td { border-bottom: 1px solid var(--google-gray-border); }
+        .item-name { display: flex; align-items: center; gap: 16px; font-weight: 500; cursor: pointer; }
+        .actions { white-space: nowrap; text-align: right; }
+        .actions button, .actions a { background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%; display: inline-flex; }
+
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fefefe; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; }
+        .modal-content input { width: 100%; padding: 10px; margin: 10px 0; }
     </style>
 </head>
 <body>
 
-    <div id="authContainer" class="center-container">
-        <div class="form-box" id="loginForm">
-            <h1>Fazer login</h1>
-            <input type="email" id="loginEmail" placeholder="E-mail" required />
-            <input type="password" id="loginPassword" placeholder="Senha" required />
-            <button onclick="handleLogin()">Entrar</button>
-            <p onclick="toggleAuthForms()">Criar conta</p>
-        </div>
-        <div class="form-box" id="registerForm" style="display: none;">
-            <h1>Criar Conta</h1>
-            <input type="email" id="registerEmail" placeholder="E-mail" required />
-            <input type="password" id="registerPassword" placeholder="Senha" required />
-            <button onclick="handleRegister()">Cadastrar</button>
-            <p onclick="toggleAuthForms()">Já tem uma conta?</p>
-        </div>
-        <p id="status"></p>
-    </div>
+    <div id="authContainer" class="center-container"> </div>
 
     <main id="main-view">
         <header class="top-bar">
             <h2>Meu Drive</h2>
             <div class="profile-section">
-                <span id="userInfo"></span>
-                <button id="logoutButton" onclick="logout()">Sair</button>
+                <span id="userInfo"></span><button onclick="logout()">Sair</button>
             </div>
         </header>
         <div class="content-area">
             <div id="breadcrumb"></div>
-            <section class="form-box" id="upload-section">
-                <h2>Upload de Arquivos</h2>
-                <input type="file" id="fileInput" multiple />
-                <button onclick="handleUpload()">Enviar para Pasta Atual</button>
-            </section>
             <section class="files-view">
                 <div class="files-header">
                     <div>
+                        <input type="file" id="fileInput" multiple style="display:none">
+                        <button onclick="document.getElementById('fileInput').click()">Upload</button>
                         <button onclick="showNewFolderModal()">+ Nova Pasta</button>
+                    </div>
+                    <div>
+                        <button id="move-selected-btn" onclick="showMoveModal()">Mover</button>
                         <button id="delete-selected-btn" onclick="deleteSelectedItems()">Excluir</button>
                     </div>
                 </div>
                 <table id="fileTable">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th>
-                            <th>Nome</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th>
+                        <th>Nome</th>
+                        <th style="text-align:right">Ações</th>
+                    </tr></thead>
                     <tbody id="fileList"></tbody>
                 </table>
             </section>
         </div>
     </main>
 
-    <div id="nameModal" class="modal">
-        <div class="modal-content">
-            <h3 id="modalTitle"></h3>
-            <input type="text" id="modalInput" placeholder="Nome">
-            <button id="modalConfirmBtn">Confirmar</button>
-            <button onclick="closeModal()">Cancelar</button>
-        </div>
-    </div>
+    <div id="nameModal" class="modal"><div class="modal-content">
+        <h3 id="modalTitle"></h3><input type="text" id="modalInput">
+        <button id="modalConfirmBtn">Confirmar</button><button onclick="closeModal()">Cancelar</button>
+    </div></div>
+    <div id="moveModal" class="modal"><div class="modal-content">
+        <h3>Mover para Pasta</h3><input type="text" id="moveInput" placeholder="Caminho/da/pasta (deixe em branco para Início)">
+        <button onclick="moveSelectedItems()">Mover</button><button onclick="closeModal()">Cancelar</button>
+    </div></div>
 
 <script>
-    // --- Seletores e Estado Global ---
-    const authContainer = document.getElementById('authContainer');
-    const mainView = document.getElementById('main-view');
-    const fileList = document.getElementById('fileList');
-    const breadcrumb = document.getElementById('breadcrumb');
-    let currentUser = null;
-    let currentPath = '';
-
-    // --- Ícones ---
+    let currentUser = null, currentPath = '';
     const folderIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#5f6368" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>`;
     const fileIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#5f6368" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path></svg>`;
+    const previewIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.48 0-4.5-2.02-4.5-4.5S9.52 7.5 12 7.5s4.5 2.02 4.5 4.5-2.02 4.5-4.5 4.5zm0-7c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5z"></path></svg>`;
     const renameIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
-    const deleteIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
 
-    // --- Funções de API ---
     async function apiCall(endpoint, body) {
-        const options = {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, user: currentUser, currentPath })
-        };
+        const options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, user: currentUser, currentPath }) };
         const response = await fetch(endpoint, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message);
-        return data;
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message); }
+        return response.json();
     }
 
-    // --- Autenticação ---
-    async function handleLogin() {
-        try {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const data = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) }).then(res => res.json());
-            if (data.user) {
-                currentUser = data.user;
-                authContainer.style.display = 'none';
-                mainView.style.display = 'block';
-                document.getElementById('userInfo').textContent = currentUser.email;
-                loadFiles('');
-            } else { throw new Error(data.message); }
-        } catch (err) { document.getElementById('status').textContent = err.message; }
-    }
-    // As outras funções de autenticação e UI (register, logout, toggleAuthForms) continuam as mesmas.
-    function logout() { location.reload(); }
-    function toggleAuthForms() {
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-        const isLoginVisible = loginForm.style.display !== 'none';
-        loginForm.style.display = isLoginVisible ? 'none' : 'block';
-        registerForm.style.display = isLoginVisible ? 'block' : 'none';
-    }
-    async function handleRegister() { /* ... Lógica de cadastro ... */ }
-
-
-    // --- Gerenciamento de Arquivos e Pastas ---
     async function loadFiles(path) {
         currentPath = path;
         try {
             const items = await apiCall('/files', {});
-            fileList.innerHTML = '';
-            items.sort((a,b) => (b.isFolder - a.isFolder) || a.name.localeCompare(b.name)); // Pastas primeiro
+            document.getElementById('fileList').innerHTML = '';
+            items.sort((a, b) => (b.isFolder - a.isFolder) || a.name.localeCompare(b.name));
             items.forEach(item => {
                 const tr = document.createElement('tr');
                 const fullItemPath = `${currentPath ? currentPath + '/' : ''}${item.name}`;
+                const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
+
                 tr.innerHTML = `
                     <td><input type="checkbox" class="item-checkbox" data-name="${item.name}"></td>
                     <td><div class="item-name" ${item.isFolder ? `onclick="loadFiles('${fullItemPath}')"` : `ondblclick="previewFile('${fullItemPath}')"`}>
                         ${item.isFolder ? folderIcon : fileIcon}<span>${item.name}</span>
                     </div></td>
                     <td class="actions">
+                        ${isPreviewable ? `<a href="/preview/${encodeURIComponent(currentUser.email)}/${fullItemPath}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
                         <button onclick="showRenameModal('${item.name}')" title="Renomear">${renameIcon}</button>
-                    </td>
-                `;
-                fileList.appendChild(tr);
+                    </td>`;
+                document.getElementById('fileList').appendChild(tr);
             });
             renderBreadcrumb();
-            updateDeleteButtonState();
-        } catch (error) {
-            alert('Erro ao carregar arquivos: ' + error.message);
-        }
+            updateActionButtonsState();
+        } catch (error) { alert(`Erro: ${error.message}`); }
     }
 
     function renderBreadcrumb() {
+        const breadcrumb = document.getElementById('breadcrumb');
         breadcrumb.innerHTML = '<a onclick="loadFiles(\'\')">Início</a>';
-        const parts = currentPath.split('/').filter(p => p);
         let path = '';
-        parts.forEach(part => {
+        currentPath.split('/').filter(p => p).forEach(part => {
             path += (path ? '/' : '') + part;
-            breadcrumb.innerHTML += `<span>/</span><a onclick="loadFiles('${path}')">${part}</a>`;
+            breadcrumb.innerHTML += `<span> / </span><a onclick="loadFiles('${path}')">${part}</a>`;
         });
     }
     
-    async function handleUpload() {
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput.files.length === 0) return;
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+        if (e.target.files.length === 0) return;
         const formData = new FormData();
-        for (const file of fileInput.files) {
-            formData.append('files', file);
-        }
+        for (const file of e.target.files) formData.append('files', file);
         try {
             await fetch(`/upload?user=${currentUser.email}&path=${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData });
+            e.target.value = '';
             loadFiles(currentPath);
-        } catch(err) { alert('Erro no upload: ' + err.message); }
-    }
+        } catch(err) { alert(`Erro no upload: ${err.message}`); }
+    });
 
-    function previewFile(path) {
-        window.open(`/preview/${encodeURIComponent(currentUser.email)}/${path}`, '_blank');
-    }
+    function previewFile(path) { if (/\.(jpg|jpeg|png|pdf)$/i.test(path)) window.open(`/preview/${encodeURIComponent(currentUser.email)}/${path}`, '_blank'); }
 
-    // --- Ações em Itens (Criar, Renomear, Deletar) ---
-    function showNewFolderModal() {
-        document.getElementById('modalTitle').textContent = 'Criar Nova Pasta';
-        document.getElementById('modalInput').value = '';
-        document.getElementById('modalConfirmBtn').onclick = createFolder;
-        document.getElementById('nameModal').style.display = 'flex';
-        document.getElementById('modalInput').focus();
+    function showModal(id, title, value, onConfirm) {
+        document.getElementById('modalTitle').textContent = title;
+        const input = document.getElementById('modalInput');
+        input.value = value;
+        document.getElementById('modalConfirmBtn').onclick = onConfirm;
+        document.getElementById(id).style.display = 'flex';
+        input.focus();
     }
-    
+    function showNewFolderModal() { showModal('nameModal', 'Criar Nova Pasta', '', createFolder); }
     async function createFolder() {
         const folderName = document.getElementById('modalInput').value;
-        if (!folderName) return;
-        try {
-            await apiCall('/folders/create', { folderName });
-            closeModal();
-            loadFiles(currentPath);
-        } catch (error) { alert('Erro: ' + error.message); }
+        if (folderName) await apiCall('/folders/create', { folderName }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
+        closeModal();
     }
-
-    function showRenameModal(oldName) {
-        document.getElementById('modalTitle').textContent = 'Renomear Item';
-        document.getElementById('modalInput').value = oldName;
-        document.getElementById('modalConfirmBtn').onclick = () => renameItem(oldName);
-        document.getElementById('nameModal').style.display = 'flex';
-        document.getElementById('modalInput').focus();
-    }
-
+    function showRenameModal(oldName) { showModal('nameModal', 'Renomear Item', oldName, () => renameItem(oldName)); }
     async function renameItem(oldName) {
         const newName = document.getElementById('modalInput').value;
-        if (!newName || newName === oldName) { closeModal(); return; }
-        try {
-            await apiCall('/items/rename', { oldName, newName });
-            closeModal();
-            loadFiles(currentPath);
-        } catch (error) { alert('Erro: ' + error.message); }
+        if (newName && newName !== oldName) await apiCall('/items/rename', { oldName, newName }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
+        closeModal();
     }
-    
-    function closeModal() {
-        document.getElementById('nameModal').style.display = 'none';
+    function showMoveModal() {
+        document.getElementById('moveModal').style.display = 'flex';
+        document.getElementById('moveInput').focus();
     }
+    async function moveSelectedItems() {
+        const destinationPath = document.getElementById('moveInput').value;
+        const itemsToMove = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.dataset.name);
+        if (itemsToMove.length > 0) {
+            await apiCall('/items/move', { itemsToMove, destinationPath })
+                .then(data => { alert(data.message); loadFiles(currentPath); })
+                .catch(err => alert(err.message));
+        }
+        closeModal();
+    }
+    function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
     
-    // --- Lógica de Seleção e Exclusão Múltipla ---
-    function updateDeleteButtonState() {
+    function updateActionButtonsState() {
         const anyChecked = document.querySelector('.item-checkbox:checked');
         document.getElementById('delete-selected-btn').style.display = anyChecked ? 'inline-block' : 'none';
+        document.getElementById('move-selected-btn').style.display = anyChecked ? 'inline-block' : 'none';
     }
-    
     function toggleSelectAll(checked) {
         document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked);
-        updateDeleteButtonState();
+        updateActionButtonsState();
     }
-    
     async function deleteSelectedItems() {
         const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name }));
-        if (items.length === 0) return;
-        if (confirm(`Tem certeza que deseja deletar ${items.length} item(ns)? Esta ação não pode ser desfeita.`)) {
-            try {
-                await apiCall('/items/delete', { items });
-                loadFiles(currentPath);
-            } catch (error) { alert('Erro ao deletar: ' + error.message); }
+        if (items.length > 0 && confirm(`Deletar ${items.length} item(ns)?`)) {
+            await apiCall('/items/delete', { items }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
         }
     }
-
-    // Adiciona listener para fechar modal com a tecla 'Esc'
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
-    });
-    // Adiciona listener para os checkboxes
-    document.getElementById('fileList').addEventListener('change', (e) => {
-        if (e.target.classList.contains('item-checkbox')) updateDeleteButtonState();
-    });
-
+    
+    // Setup inicial e listeners (login, etc.)
+    // ...
 </script>
+
 </body>
 </html>
