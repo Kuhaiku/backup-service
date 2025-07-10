@@ -56,10 +56,12 @@
     const folderIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#5f6368" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>`;
     const fileIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#5f6368" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path></svg>`;
     const previewIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.48 0-4.5-2.02-4.5-4.5S9.52 7.5 12 7.5s4.5 2.02 4.5 4.5-2.02 4.5-4.5 4.5zm0-7c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5z"></path></svg>`;
+    const downloadIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>`;
     const renameIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
     const deleteIcon = `<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#d93025" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
     
     function escapeHTML(str) {
+        if (typeof str !== 'string') return '';
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
     
@@ -128,14 +130,14 @@
         try {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            const data = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) }).then(res => res.json());
-            if (data.user) {
-                currentUser = data.user;
-                document.getElementById('authContainer').style.display = 'none';
-                document.getElementById('main-view').style.display = 'block';
-                document.getElementById('userInfo').textContent = currentUser.email;
-                loadFiles('');
-            } else { throw new Error(data.message); }
+            const response = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            currentUser = data.user;
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('main-view').style.display = 'block';
+            document.getElementById('userInfo').textContent = currentUser.email;
+            loadFiles('');
         } catch (err) { document.getElementById('status').textContent = err.message; }
     }
 
@@ -143,20 +145,19 @@
         try {
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
-            const data = await fetch('/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) }).then(res => res.json());
-            if (res.ok) {
-                alert(data.message);
-                toggleAuthForms();
-            } else { throw new Error(data.message); }
+            const response = await fetch('/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            alert(data.message);
+            toggleAuthForms();
         } catch (err) { document.getElementById('status').textContent = err.message; }
     }
     
     function toggleAuthForms() {
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
-        const isLoginVisible = loginForm.style.display !== 'none';
-        loginForm.style.display = isLoginVisible ? 'none' : 'block';
-        registerForm.style.display = isLoginVisible ? 'block' : 'none';
+        loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
+        registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
     }
     
     function logout() { location.reload(); }
@@ -168,25 +169,32 @@
             const fileListBody = document.getElementById('fileList');
             fileListBody.innerHTML = '';
             items.sort((a, b) => (b.isFolder - a.isFolder) || a.name.localeCompare(b.name));
-            items.forEach(item => {
-                const tr = document.createElement('tr');
-                const fullItemPath = `${currentPath ? currentPath + '/' : ''}${item.name}`;
-                const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
-                const safeFullPath = escapeHTML(fullItemPath);
-                const safeName = escapeHTML(item.name);
+            if (items.length === 0) {
+                fileListBody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;">Esta pasta está vazia.</td></tr>`;
+            } else {
+                items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const fullItemPath = `${currentPath ? currentPath + '/' : ''}${item.name}`;
+                    const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
+                    const safeName = escapeHTML(item.name);
 
-                tr.innerHTML = `
-                    <td><input type="checkbox" class="item-checkbox" data-name="${safeName}"></td>
-                    <td><div class="item-name" ${item.isFolder ? `onclick="loadFiles('${safeFullPath}')"` : `ondblclick="previewFile('${safeFullPath}')"`}>
-                        ${item.isFolder ? folderIcon : fileIcon}<span>${item.name}</span>
-                    </div></td>
-                    <td class="actions">
-                        ${isPreviewable ? `<a href="/preview/${encodeURIComponent(currentUser.email)}/${fullItemPath}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
-                        <button onclick="showRenameModal('${safeName}')" title="Renomear">${renameIcon}</button>
-                        <button onclick="deleteSingleItem('${safeName}')" title="Excluir">${deleteIcon}</button>
-                    </td>`;
-                fileListBody.appendChild(tr);
-            });
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="item-checkbox" data-name="${safeName}"></td>
+                        <td>
+                            <div class="item-name" ${item.isFolder ? `onclick="loadFiles('${escapeHTML(fullItemPath)}')"` : `ondblclick="previewFile('${escapeHTML(fullItemPath)}')"`}>
+                                ${item.isFolder ? folderIcon : fileIcon}
+                                <span>${item.name}</span>
+                            </div>
+                        </td>
+                        <td class="actions">
+                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(currentUser.email)}/${encodeURIComponent(fullItemPath)}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
+                            ${!item.isFolder ? `<a href="/download/${encodeURIComponent(currentUser.email)}/${encodeURIComponent(fullItemPath)}" title="Baixar">${downloadIcon}</a>` : ''}
+                            <button onclick="showRenameModal('${safeName}')" title="Renomear">${renameIcon}</button>
+                            <button onclick="deleteSingleItem('${safeName}')" title="Excluir">${deleteIcon}</button>
+                        </td>`;
+                    fileListBody.appendChild(tr);
+                });
+            }
             renderBreadcrumb();
             updateActionButtonsState();
         } catch (error) { alert(`Erro ao carregar arquivos: ${error.message}`); }
@@ -213,7 +221,7 @@
         } catch(err) { alert(`Erro no upload: ${err.message}`); }
     }
 
-    function previewFile(path) { if (/\.(jpg|jpeg|png|pdf)$/i.test(path)) window.open(`/preview/${encodeURIComponent(currentUser.email)}/${path}`, '_blank'); }
+    function previewFile(path) { if (/\.(jpg|jpeg|png|pdf)$/i.test(path)) window.open(`/preview/${encodeURIComponent(currentUser.email)}/${encodeURIComponent(path)}`, '_blank'); }
 
     function showModal(modalId, title, value, onConfirm) {
         const modal = document.getElementById(modalId);
@@ -224,6 +232,7 @@
         modal.style.display = 'flex';
         input.focus();
     }
+    
     function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
 
     function showNewFolderModal() { showModal('nameModal', 'Criar Nova Pasta', '', createFolder); }
@@ -232,6 +241,7 @@
         if (folderName) await apiCall('/folders/create', { folderName }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
         closeModal();
     }
+    
     function showRenameModal(oldName) { showModal('nameModal', 'Renomear Item', oldName, () => renameItem(oldName)); }
     async function renameItem(oldName) {
         const newName = document.getElementById('modalInput').value;
@@ -271,10 +281,12 @@
             await apiCall('/items/delete', { items }).then(() => loadFiles(currentPath)).catch(err => alert(err.message));
         }
     }
+    
     function deleteSelectedItems() {
         const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name }));
         deleteItems(items);
     }
+    
     function deleteSingleItem(name) {
         deleteItems([{ name }]);
     }
