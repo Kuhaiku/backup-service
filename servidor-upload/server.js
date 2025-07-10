@@ -109,10 +109,7 @@ app.post('/login', (req, res) => {
 });
 
 
-// --- ROTAS DE ARQUIVOS (Adaptadas para usar o e-mail como identificador) ---
-
-// As rotas de arquivos (/files, /download, /delete, etc.) permanecem quase iguais,
-// mas agora a identificação do usuário (e sua pasta) é o e-mail.
+// --- ROTAS DE ARQUIVOS ---
 
 app.get('/files', (req, res) => {
     const userEmail = (req.query.user || '').toLowerCase();
@@ -127,20 +124,20 @@ app.get('/files', (req, res) => {
         return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
 
-    // Se for o usuário mestre, lista todos os arquivos
     if (currentUser.role === 'master') {
         const allFiles = [];
         const userFolders = fs.readdirSync(baseUploadFolder);
         userFolders.forEach(folder => {
-            const userFolderFiles = fs.readdirSync(path.join(baseUploadFolder, folder));
-            userFolderFiles.forEach(file => {
-                allFiles.push({ user: folder, name: file });
-            });
+            if (fs.statSync(path.join(baseUploadFolder, folder)).isDirectory()) {
+                const userFolderFiles = fs.readdirSync(path.join(baseUploadFolder, folder));
+                userFolderFiles.forEach(file => {
+                    allFiles.push({ user: folder, name: file });
+                });
+            }
         });
         return res.json(allFiles);
     }
 
-    // Para usuários normais, lista apenas os da sua pasta
     const userFolder = path.join(baseUploadFolder, userEmail);
     if (!fs.existsSync(userFolder)) return res.json([]);
 
@@ -148,7 +145,23 @@ app.get('/files', (req, res) => {
     res.json(files.map(file => ({ user: userEmail, name: file })));
 });
 
-// Download, Delete e Upload usam o e-mail na URL
+// ROTA PARA VISUALIZAR ARQUIVO
+app.get('/preview/:user/:filename', (req, res) => {
+    const { user, filename } = req.params;
+    const filePath = path.join(baseUploadFolder, user.toLowerCase(), filename);
+
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath, (err) => {
+            if (err) {
+                res.status(500).send('Não foi possível ler o arquivo.');
+            }
+        });
+    } else {
+        res.status(404).send('Arquivo não encontrado.');
+    }
+});
+
+
 app.get('/download/:user/:filename', (req, res) => {
     const { user, filename } = req.params;
     const filePath = path.join(baseUploadFolder, user.toLowerCase(), filename);
@@ -156,22 +169,43 @@ app.get('/download/:user/:filename', (req, res) => {
     else res.status(404).send('Arquivo não encontrado.');
 });
 
-app.delete('/delete/:user/:filename', (req, res) => {
-    const { user, filename } = req.params;
-    const filePath = path.join(baseUploadFolder, user.toLowerCase(), filename);
-    if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        res.send(`Arquivo ${filename} deletado com sucesso.`);
-    } else {
-        res.status(404).send('Arquivo não encontrado.');
-    }
-});
-
 app.post('/upload', upload.array('files', 20), (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
     res.send(`Arquivos enviados com sucesso.`);
+});
+
+// ROTA PARA DELETAR MÚLTIPLOS ARQUIVOS
+app.post('/delete-many', (req, res) => {
+    const { files } = req.body; // Espera um array de {user, name}
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ message: 'Nenhum arquivo selecionado para exclusão.' });
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    files.forEach(file => {
+        const filePath = path.join(baseUploadFolder, file.user.toLowerCase(), file.name);
+        if (fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+                deletedCount++;
+            } catch (err) {
+                errors.push(file.name);
+            }
+        } else {
+            errors.push(file.name);
+        }
+    });
+
+    if (errors.length > 0) {
+        return res.status(500).json({ message: `Concluído com erros. ${deletedCount} arquivos deletados. Falha nos arquivos: ${errors.join(', ')}` });
+    }
+
+    res.json({ message: `${deletedCount} arquivos deletados com sucesso!` });
 });
 
 
