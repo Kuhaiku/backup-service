@@ -7,22 +7,27 @@
         :root { --google-blue: #1a73e8; --google-gray-border: #dadce0; --google-gray-background: #f8f9fa; --google-gray-text: #5f6368; --danger-red: #d93025; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Roboto', sans-serif; background-color: var(--google-gray-background); color: #202124; }
+        
         .center-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
         .form-box { background-color: #fff; padding: 24px; border: 1px solid var(--google-gray-border); border-radius: 8px; width: 100%; max-width: 448px; text-align: center; margin-bottom: 16px; }
         .form-box h1 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
         .form-box input { width: 100%; padding: 13px; margin-bottom: 15px; border-radius: 4px; border: 1px solid var(--google-gray-border); }
         .form-box button { width: 100%; background-color: var(--google-blue); color: #fff; border: none; padding: 10px; font-weight: 500; border-radius: 4px; cursor: pointer; }
+        
         #main-view { display: none; }
         .top-bar { background-color: #fff; padding: 12px 20px; border-bottom: 1px solid var(--google-gray-border); display: flex; justify-content: space-between; align-items: center; position: fixed; width: 100%; top: 0; z-index: 1000; }
         .content-area { padding: 80px 20px 30px; }
+        
         #breadcrumb { padding: 10px 0; font-size: 14px; word-break: break-all; }
         #breadcrumb a { color: var(--google-blue); text-decoration: none; cursor: pointer; }
+        
         .files-view { background-color: #fff; border: 1px solid var(--google-gray-border); border-radius: 8px; overflow: hidden; }
         .files-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 2px solid var(--google-gray-border); gap: 10px; }
         .files-header .actions-group button { background-color: var(--google-blue); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: 500; margin-left: 10px; }
         #delete-selected-btn, #move-selected-btn, #download-selected-btn { display: none; }
         #delete-selected-btn { background-color: var(--danger-red); }
         #move-selected-btn, #download-selected-btn { background-color: #5f6368; }
+        
         .table-container { width: 100%; overflow-x: auto; }
         #fileTable { width: 100%; border-collapse: collapse; }
         #fileTable th, #fileTable td { padding: 12px; vertical-align: middle; text-align: left; white-space: nowrap; }
@@ -32,9 +37,15 @@
         .item-name span { text-overflow: ellipsis; overflow: hidden; }
         .actions-col { text-align: right; }
         .actions-col > * { margin-left: 4px; background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%; display: inline-flex; }
+        
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; padding: 20px; }
         .modal-content { background-color: #fefefe; padding: 20px; border-radius: 8px; width: 100%; max-width: 400px; }
-        @media (max-width: 600px) { .files-header { flex-direction: column; align-items: stretch; } .files-header .actions-group { display: flex; flex-direction: column; gap: 10px; } .files-header .actions-group button { margin-left: 0; width: 100%; } }
+
+        @media (max-width: 600px) {
+            .files-header { flex-direction: column; align-items: stretch; }
+            .files-header .actions-group { display: flex; flex-direction: column; gap: 10px; }
+            .files-header .actions-group button { margin-left: 0; width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -63,6 +74,25 @@
     function toggleAuthForms() { const l = document.getElementById('loginForm'), r = document.getElementById('registerForm'); l.style.display = l.style.display === 'none' ? 'block' : 'none'; r.style.display = r.style.display === 'none' ? 'block' : 'none'; }
     function logout() { location.reload(); }
     
+    // **NOVA FUNÇÃO AUXILIAR PARA CORRIGIR URLS**
+    function getActionUrls(itemName) {
+        const fullItemPath = `${currentPath ? currentPath + '/' : ''}${itemName}`;
+        const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
+
+        let ownerForLink = currentUser.email;
+        let relativePathForLink = fullItemPath;
+        
+        if (currentUser.role === 'master') {
+            ownerForLink = isMasterAtRoot ? itemName : currentPath.split('/')[0];
+            relativePathForLink = isMasterAtRoot ? '' : fullItemPath.substring(ownerForLink.length + 1);
+        }
+
+        return {
+            preview: `/preview/${encodeURIComponent(ownerForLink)}/${encodeURIComponent(relativePathForLink)}`,
+            download: `/download/${encodeURIComponent(ownerForLink)}/${encodeURIComponent(relativePathForLink)}`
+        };
+    }
+
     async function loadFiles(path) {
         currentPath = path;
         try {
@@ -76,18 +106,15 @@
                     const tr = document.createElement('tr');
                     const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
                     const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
+                    const urls = getActionUrls(item.name);
                     
-                    const ownerEmail = isMasterAtRoot ? item.name : (currentPath.split('/')[0] || currentUser.email);
-                    const fullItemPathForAction = `${currentPath ? currentPath + '/' : ''}${item.name}`;
-                    const relativePathForLink = isMasterAtRoot ? '' : fullItemPathForAction.substring(ownerEmail.length).replace(/^\//, '');
-
                     tr.innerHTML = `
                         <td><input type="checkbox" class="item-checkbox" data-name="${item.name}"></td>
-                        <td><div class="item-name" ${item.isFolder ? `onclick="loadFiles('${fullItemPathForAction}')"` : `ondblclick="previewFile('${fullItemPathForAction}')"`}>
+                        <td><div class="item-name" ${item.isFolder ? `onclick="loadFiles('${currentPath ? currentPath + '/' : ''}${item.name}')"` : `ondblclick="window.open('${urls.preview}', '_blank')"`}>
                             ${item.isUserFolder ? ICONS.user : (item.isFolder ? ICONS.folder : ICONS.file)}<span>${item.name}</span>
                         </div></td>
                         <td class="actions-col">
-                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePathForLink)}" target="_blank" title="Visualizar">${ICONS.preview}</a>` : ''}
+                            ${isPreviewable ? `<a href="${urls.preview}" target="_blank" title="Visualizar">${ICONS.preview}</a>` : ''}
                             <a href="#" onclick="downloadItem(event, '${item.name}', ${item.isFolder})" title="Baixar">${ICONS.download}</a>
                             ${!item.isUserFolder ? `<button onclick="showRenameModal('${item.name}')" title="Renomear">${ICONS.rename}</button>` : ''}
                             ${!item.isUserFolder ? `<button onclick="deleteSingleItem('${item.name}')" title="Excluir">${ICONS.delete}</button>` : ''}
@@ -105,7 +132,7 @@
 
     function renderBreadcrumb() { const el = document.getElementById('breadcrumb'); el.innerHTML = '<a onclick="loadFiles(\'\')">Início</a>'; let acc = ''; currentPath.split('/').filter(p=>p).forEach(p => { acc += (acc ? '/' : '') + p; el.innerHTML += `<span> / </span><a onclick="loadFiles('${acc}')">${p}</a>`; }); }
     async function handleUpload(event) { if (event.target.files.length === 0) return; const formData = new FormData(); for (const file of event.target.files) formData.append('files', file); try { const response = await fetch(`/upload?user=${currentUser.email}&path=${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData }); const data = await response.json(); if (!response.ok) throw new Error(data.message); event.target.value = ''; loadFiles(currentPath); alert(data.message); } catch(err) { alert(`Erro no upload: ${err.message}`); } }
-    function previewFile(path) { if (!/\.(jpg|jpeg|png|pdf)$/i.test(path)) return; const ownerEmail = (currentPath.split('/')[0] && currentUser.role === 'master') ? currentPath.split('/')[0] : currentUser.email; const relativePath = currentUser.role === 'master' ? path.substring(ownerEmail.length+1) : path; window.open(`/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}`, '_blank'); }
+    
     function showModal(modalId, title, value, onConfirm) { const modal = document.getElementById(modalId); if(title) modal.querySelector('h3').textContent = title; const input = modal.querySelector('input'); input.value = value; modal.querySelector('button').onclick = onConfirm; modal.style.display = 'flex'; input.focus(); }
     function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
     function showNewFolderModal() { showModal('nameModal', 'Criar Nova Pasta', '', createFolder); }
@@ -114,12 +141,16 @@
     async function renameItem(oldName) { const newName = document.getElementById('modalInput').value; if (newName && newName !== oldName) await apiCall('/items/rename', { oldName, newName }).then(() => loadFiles(currentPath)).catch(err => alert(err.message)); closeModal(); }
     function showMoveModal() { const dest = (currentPath.split('/').length > 1 && currentUser.role === 'master') ? currentPath.substring(currentPath.split('/')[0].length + 1) : currentPath; showModal('moveModal', null, dest, moveSelectedItems); }
     async function moveSelectedItems() { const destPath = document.getElementById('moveInput').value; const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.dataset.name); if (items.length > 0) await apiCall('/items/move', { itemsToMove: items, destinationPath: destPath }).then(d => { alert(d.message); loadFiles(currentPath); }).catch(err => alert(err.message)); closeModal(); }
+    
     function updateActionButtonsState() { const anyChecked = document.querySelector('.item-checkbox:checked'); const isMasterAtRoot = currentUser && currentUser.role === 'master' && currentPath === ''; document.getElementById('delete-selected-btn').style.display = anyChecked && !isMasterAtRoot ? 'inline-block' : 'none'; document.getElementById('move-selected-btn').style.display = anyChecked && !isMasterAtRoot ? 'inline-block' : 'none'; document.getElementById('download-selected-btn').style.display = anyChecked && !isMasterAtRoot ? 'inline-block' : 'none'; }
     function toggleSelectAll(checked) { document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked); updateActionButtonsState(); }
+    
     document.body.addEventListener('change', e => { if (e.target.classList.contains('item-checkbox')) updateActionButtonsState(); });
+    
     async function deleteItems(items) { if (items.length > 0 && confirm(`Deletar ${items.length} item(ns)?`)) await apiCall('/items/delete', { items }).then(() => loadFiles(currentPath)).catch(err => alert(err.message)); }
     function deleteSelectedItems() { const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name })); deleteItems(items); }
     function deleteSingleItem(name) { deleteItems([{ name }]); }
+    
     async function downloadItems(items) { try { const response = await fetch('/download-many', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: currentUser, currentPath, items }) }); if (!response.ok) throw new Error('Falha ao iniciar o download.'); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.style.display = 'none'; a.href = url; a.download = 'backup.zip'; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); a.remove(); } catch (err) { alert(`Erro no download: ${err.message}`); } }
     function downloadSelectedItems() { const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => ({ name: cb.dataset.name })); if(items.length > 0) downloadItems(items); }
     function downloadItem(event, name, isFolder) {
@@ -127,10 +158,8 @@
         if (isFolder) {
             downloadItems([{ name }]);
         } else {
-            const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
-            const ownerEmail = isMasterAtRoot ? name : (currentPath.split('/')[0] || currentUser.email);
-            const relativePath = isMasterAtRoot ? '' : (currentPath.substring(ownerEmail.length).replace(/^\//, '') + '/' + name);
-            window.location.href = `/download/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}`;
+            const urls = getActionUrls(name);
+            window.location.href = urls.download;
         }
     }
     
