@@ -177,6 +177,30 @@ app.post('/download-many', (req, res) => {
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
+// **NOVA ROTA PARA LISTAR PASTAS**
+app.post('/folders/list', (req, res) => {
+    try {
+        let { targetUser } = processMasterRequest(req.body);
+        const userRoot = getSafePath(targetUser, '');
+        const folders = ['']; // Adiciona a raiz
+        
+        function findFolders(currentDir) {
+            fs.readdirSync(currentDir, { withFileTypes: true }).forEach(dirent => {
+                if (dirent.isDirectory()) {
+                    const folderPath = path.join(currentDir, dirent.name);
+                    folders.push(path.relative(userRoot, folderPath));
+                    findFolders(folderPath);
+                }
+            });
+        }
+        findFolders(userRoot);
+        res.json(folders.map(f => f.replace(/\\/g, '/'))); // Garante barras consistentes
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+
 app.get('/:action(preview|download)/:userEmail/*', (req, res) => {
     try {
         const { action, userEmail } = req.params;
