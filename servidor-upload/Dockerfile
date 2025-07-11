@@ -1,23 +1,24 @@
-# Imagem base oficial do Node.js
-FROM node:20
+# Dockerfile
 
-# Definir o diretório de trabalho dentro do container
-WORKDIR /app
+# Passo 1: Use uma imagem base oficial do Node.js. A versão Alpine é leve.
+FROM node:18-alpine AS base
 
-# Copiar os arquivos package.json e package-lock.json (se houver)
+# Passo 2: Crie e defina o diretório de trabalho dentro do contêiner
+WORKDIR /usr/src/app
+
+# Passo 3: Copie os ficheiros de dependências
+# Copia `package.json` e `package-lock.json` (se existir)
 COPY package*.json ./
 
-# Instalar as dependências
-RUN npm install
+# Passo 4: Instale as dependências de produção
+# O `npm ci` é mais rápido e seguro para builds contínuos, mas `install` também funciona.
+RUN npm install --production
 
-# Copiar todo o restante do projeto para o container
+# Passo 5: Copie o resto do código da aplicação
 COPY . .
 
-# Criar a pasta 'uploads' caso ela não exista
-RUN mkdir -p /app/uploads
-
-# Expor a porta que a aplicação usa
+# Passo 6: Exponha a porta em que a aplicação corre
 EXPOSE 3000
 
-# Comando para rodar a aplicação
-CMD ["node", "server.js"]
+# Passo 7: Comando para iniciar a aplicação
+CMD [ "node", "server.js" ]
