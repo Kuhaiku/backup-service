@@ -1,14 +1,15 @@
 {
   "name": "upload-server",
   "version": "1.0.0",
-  "description": "Servidor Node.js para upload de múltiplos arquivos via web",
+  "description": "Servidor Node.js para upload de múltiplos arquivos via web com sistema de pastas",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "author": "Leonardo Raposo",
+  "author": "Leonardo Raposo (com contribuições de Gemini)",
   "license": "MIT",
   "dependencies": {
+    "archiver": "^7.0.1",
     "express": "^4.18.4",
     "multer": "^1.4.5-lts.1"
   }
