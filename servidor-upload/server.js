@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const archiver = require('archiver'); // <-- Nova dependência
+const archiver = require('archiver');
 
 const app = express();
 const PORT = 3000;
@@ -79,7 +79,7 @@ const upload = multer({ storage });
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// --- ROTAS DE AUTENTICAÇÃO (Sem alterações) ---
+// --- ROTAS DE AUTENTICAÇÃO ---
 app.post('/register', (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
@@ -100,6 +100,18 @@ app.post('/login', (req, res) => {
 });
 
 // --- ROTAS DE ARQUIVOS E PASTAS ---
+function processMasterRequest(reqBody) {
+    let { user, currentPath } = reqBody;
+    let targetUser = user.email;
+    let relativePath = currentPath;
+    if (user.role === 'master' && currentPath !== '') {
+        const parsed = parseMasterPath(currentPath);
+        targetUser = parsed.targetUser;
+        relativePath = parsed.relativePath;
+    }
+    return { targetUser, relativePath };
+}
+
 app.post('/files', (req, res) => {
     try {
         const { user, currentPath } = req.body;
@@ -109,13 +121,7 @@ app.post('/files', (req, res) => {
                 .map(dirent => ({ name: dirent.name, isFolder: true, isUserFolder: true }));
             return res.json(userFolders);
         }
-        let targetUser = user.email;
-        let relativePath = currentPath;
-        if (user.role === 'master') {
-            const parsed = parseMasterPath(currentPath);
-            targetUser = parsed.targetUser;
-            relativePath = parsed.relativePath;
-        }
+        const { targetUser, relativePath } = processMasterRequest(req.body);
         const safePath = getSafePath(targetUser, relativePath);
         const items = fs.readdirSync(safePath, { withFileTypes: true });
         res.json(items.map(item => ({ name: item.name, isFolder: item.isDirectory() })));
@@ -129,18 +135,6 @@ app.post('/upload', (req, res) => {
         res.json({ message: 'Arquivos enviados com sucesso!' });
     });
 });
-
-function processMasterRequest(reqBody) {
-    let { user, currentPath } = reqBody;
-    let targetUser = user.email;
-    let relativePath = currentPath;
-    if (user.role === 'master' && currentPath !== '') {
-        const parsed = parseMasterPath(currentPath);
-        targetUser = parsed.targetUser;
-        relativePath = parsed.relativePath;
-    }
-    return { targetUser, relativePath };
-}
 
 app.post('/folders/create', (req, res) => {
     try {
@@ -165,38 +159,28 @@ app.post('/items/delete', (req, res) => {
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// **NOVA ROTA PARA BAIXAR MÚLTIPLOS ITENS**
 app.post('/download-many', (req, res) => {
     try {
         const { user, currentPath, items } = req.body;
         let { targetUser, relativePath } = processMasterRequest({ user, currentPath });
-
         const archive = archiver('zip', { zlib: { level: 9 } });
         res.attachment('backup.zip');
         archive.pipe(res);
-
         items.forEach(item => {
             const itemPath = getSafePath(targetUser, path.join(relativePath, item.name));
             if (fs.existsSync(itemPath)) {
-                if (fs.statSync(itemPath).isDirectory()) {
-                    archive.directory(itemPath, item.name);
-                } else {
-                    archive.file(itemPath, { name: item.name });
-                }
+                if (fs.statSync(itemPath).isDirectory()) archive.directory(itemPath, item.name);
+                else archive.file(itemPath, { name: item.name });
             }
         });
         archive.finalize();
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-
-// Rotas de preview e download individual
 app.get('/:action(preview|download)/:userEmail/*', (req, res) => {
     try {
         const { action, userEmail } = req.params;
-        const relativePath = req.params[0];
+        const relativePath = req.params[0] || '';
         const safePath = getSafePath(userEmail, relativePath);
         if (fs.existsSync(safePath) && fs.statSync(safePath).isFile()) {
             if (action === 'preview') res.sendFile(safePath);
@@ -205,9 +189,7 @@ app.get('/:action(preview|download)/:userEmail/*', (req, res) => {
     } catch (error) { res.status(400).send(error.message); }
 });
 
-// As rotas de renomear e mover permanecem as mesmas
 app.post('/items/rename', (req, res) => { try { const { targetUser, relativePath } = processMasterRequest(req.body); const { oldName, newName } = req.body; if (!newName || /[\\/]/.test(newName)) return res.status(400).json({ message: 'Novo nome inválido.' }); const oldPath = getSafePath(targetUser, path.join(relativePath, oldName)); const newPath = getSafePath(targetUser, path.join(relativePath, newName)); if (!fs.existsSync(oldPath)) return res.status(404).json({ message: 'Item não encontrado.' }); if (fs.existsSync(newPath)) return res.status(409).json({ message: 'Já existe um item com o novo nome.' }); fs.renameSync(oldPath, newPath); res.json({ message: 'Item renomeado com sucesso!' }); } catch (error) { res.status(500).json({ message: error.message }); } });
 app.post('/items/move', (req, res) => { try { const { user, currentPath, itemsToMove, destinationPath } = req.body; let { targetUser, relativePath: sourceRelativePath } = processMasterRequest({ user, currentPath }); const destSafePath = getSafePath(targetUser, destinationPath); if (!fs.existsSync(destSafePath) || !fs.statSync(destSafePath).isDirectory()) return res.status(400).json({ message: 'Pasta de destino inválida.' }); const errors = []; itemsToMove.forEach(itemName => { const sourcePath = getSafePath(targetUser, path.join(sourceRelativePath, itemName)); const finalDestPath = path.join(destSafePath, itemName); if (destSafePath.startsWith(sourcePath + path.sep)) { errors.push(`${itemName}: Não é possível mover uma pasta para dentro dela mesma.`); return; } if (fs.existsSync(finalDestPath)) { errors.push(`${itemName}: já existe no destino.`); } else { fs.renameSync(sourcePath, finalDestPath); } }); if (errors.length > 0) return res.status(409).json({ message: `Concluído com erros: ${errors.join(' ')}` }); res.json({ message: 'Itens movidos com sucesso!' }); } catch (error) { res.status(500).json({ message: error.message }); } });
-
 
 app.listen(PORT, () => { console.log(`Servidor rodando em http://localhost:${PORT}`); });
