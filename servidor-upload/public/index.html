@@ -88,12 +88,15 @@
             else {
                 items.forEach(item => {
                     const tr = document.createElement('tr');
-                    const fullItemPath = `${currentPath ? currentPath + '/' : ''}${item.name}`;
                     const isPreviewable = !item.isFolder && /\.(jpg|jpeg|png|pdf)$/i.test(item.name);
                     const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
                     
+                    // Lógica corrigida para obter o caminho relativo e o proprietário corretos
                     const ownerEmail = isMasterAtRoot ? item.name : (currentPath.split('/')[0] || currentUser.email);
-                    const relativePath = isMasterAtRoot ? '' : fullItemPath.substring(ownerEmail.length).replace(/^\//, '');
+                    const fullItemPathForLink = `${currentPath ? currentPath + '/' : ''}${item.name}`;
+                    const relativePathForLink = currentUser.role === 'master' && !isMasterAtRoot 
+                        ? fullItemPathForLink.substring(ownerEmail.length + 1) 
+                        : (isMasterAtRoot ? '' : fullItemPathForLink);
 
                     tr.innerHTML = `
                         <td><input type="checkbox" class="item-checkbox" data-name="${item.name}"></td>
@@ -101,7 +104,7 @@
                             ${item.isUserFolder ? userFolderIcon : (item.isFolder ? folderIcon : fileIcon)}<span>${item.name}</span>
                         </div></td>
                         <td class="actions-col">
-                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
+                            ${isPreviewable ? `<a href="/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePathForLink)}" target="_blank" title="Visualizar">${previewIcon}</a>` : ''}
                             <a href="#" onclick="downloadItem(event, '${item.name}', ${item.isFolder})" title="Baixar">${downloadIcon}</a>
                             ${!item.isUserFolder ? `<button onclick="showRenameModal('${item.name}')" title="Renomear">${renameIcon}</button>` : ''}
                             ${!item.isUserFolder ? `<button onclick="deleteSingleItem('${item.name}')" title="Excluir">${deleteIcon}</button>` : ''}
@@ -116,22 +119,24 @@
             document.getElementById('new-folder-btn').style.display = isMasterAtRoot ? 'none' : 'inline-block';
         } catch (error) { alert(`Erro: ${error.message}`); }
     }
-    
+
     function renderBreadcrumb() { const el = document.getElementById('breadcrumb'); el.innerHTML = '<a onclick="loadFiles(\'\')">Início</a>'; let acc = ''; currentPath.split('/').filter(p=>p).forEach(p => { acc += (acc ? '/' : '') + p; el.innerHTML += `<span> / </span><a onclick="loadFiles('${acc}')">${p}</a>`; }); }
-    
     async function handleUpload(event) { if (event.target.files.length === 0) return; const formData = new FormData(); for (const file of event.target.files) formData.append('files', file); try { const response = await fetch(`/upload?user=${currentUser.email}&path=${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData }); const data = await response.json(); if (!response.ok) throw new Error(data.message); event.target.value = ''; loadFiles(currentPath); alert(data.message); } catch(err) { alert(`Erro no upload: ${err.message}`); } }
     
-    function previewFile(path) { if (!/\.(jpg|jpeg|png|pdf)$/i.test(path)) return; const ownerEmail = (currentPath.split('/')[0] && currentUser.role === 'master') ? currentPath.split('/')[0] : currentUser.email; const relativePath = currentUser.role === 'master' ? path.substring(ownerEmail.length+1) : path; window.open(`/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}`, '_blank'); }
-    
+    function previewFile(path) {
+        if (!/\.(jpg|jpeg|png|pdf)$/i.test(path)) return;
+        const isMasterAtRoot = currentUser.role === 'master' && currentPath === '';
+        const ownerEmail = isMasterAtRoot ? path : (currentPath.split('/')[0] || currentUser.email);
+        const relativePath = isMasterAtRoot ? '' : path.substring(ownerEmail.length).replace(/^\//, '');
+        window.open(`/preview/${encodeURIComponent(ownerEmail)}/${encodeURIComponent(relativePath)}`, '_blank');
+    }
+
     function showModal(modalId, title, value, onConfirm) { const modal = document.getElementById(modalId); if(title) modal.querySelector('h3').textContent = title; const input = modal.querySelector('input'); input.value = value; modal.querySelector('button').onclick = onConfirm; modal.style.display = 'flex'; input.focus(); }
     function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-    
     function showNewFolderModal() { showModal('nameModal', 'Criar Nova Pasta', '', createFolder); }
     async function createFolder() { const name = document.getElementById('modalInput').value; if (name) await apiCall('/folders/create', { folderName: name }).then(() => loadFiles(currentPath)).catch(err => alert(err.message)); closeModal(); }
-    
     function showRenameModal(oldName) { showModal('nameModal', 'Renomear Item', oldName, () => renameItem(oldName)); }
     async function renameItem(oldName) { const newName = document.getElementById('modalInput').value; if (newName && newName !== oldName) await apiCall('/items/rename', { oldName, newName }).then(() => loadFiles(currentPath)).catch(err => alert(err.message)); closeModal(); }
-    
     function showMoveModal() { const dest = (currentPath.split('/').length > 1 && currentUser.role === 'master') ? currentPath.substring(currentPath.split('/')[0].length + 1) : currentPath; showModal('moveModal', null, dest, moveSelectedItems); }
     async function moveSelectedItems() { const destPath = document.getElementById('moveInput').value; const items = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.dataset.name); if (items.length > 0) await apiCall('/items/move', { itemsToMove: items, destinationPath: destPath }).then(d => { alert(d.message); loadFiles(currentPath); }).catch(err => alert(err.message)); closeModal(); }
     
